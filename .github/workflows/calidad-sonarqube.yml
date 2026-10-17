@@ -21,12 +21,12 @@ jobs:
 
     steps:
       - name: Descargar el codigo de la rama
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Configurar Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -40,7 +40,7 @@ jobs:
 
       - name: Publicar reporte HTML de JaCoCo
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reporte-jacoco
           path: target/site/jacoco/
@@ -48,7 +48,7 @@ jobs:
 
       - name: Publicar resultados de las pruebas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resultados-pruebas
           path: target/surefire-reports/
