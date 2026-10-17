@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - calidad
+      - "Sprint-*"
   pull_request:
     branches:
       - calidad
+      - "Sprint-*"
   workflow_dispatch:
 
 permissions:
@@ -55,7 +57,10 @@ jobs:
           if-no-files-found: warn
 
       - name: Analizar en SonarQube Cloud
-        if: ${{ success() && env.SONAR_TOKEN != '' }}
+        if: >-
+          ${{ success() && env.SONAR_TOKEN != '' &&
+          (github.ref == 'refs/heads/calidad' ||
+          (github.event_name == 'pull_request' && github.base_ref == 'calidad')) }}
         run: >-
           ./mvnw --batch-mode
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
