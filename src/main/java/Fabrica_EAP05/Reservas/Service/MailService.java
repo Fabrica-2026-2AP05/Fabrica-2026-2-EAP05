@@ -14,30 +14,27 @@ public class MailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    public void enviarEmailResetPassword(String destinatario, String nombreUsuario, String resetLink) throws MessagingException {
+    public void enviarEmailResetPassword(String destinatario, String nombreUsuario, String token) throws MessagingException {
         MimeMessage mensaje = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mensaje, "UTF-8");
 
         helper.setTo(destinatario);
-        helper.setFrom("no-reply@fabrica-eap05.com");
-        helper.setSubject("Establece tu contraseña - Fabrica EAP05");
+        helper.setFrom("reservas.fabrica.eap05@gmail.com");
+        helper.setSubject("Recuperación de contraseña - Fabrica EAP05");
 
         String html = """
                 <html>
                 <body style="font-family: Arial, sans-serif; color: #333;">
                     <h2>¡Hola %s!</h2>
-                    <p>Tu cuenta fue registrada correctamente. Para poder iniciar sesión, primero debes establecer tu contraseña.</p>
-                    <p>
-                        <a href="%s" style="background-color:#2563eb;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">
-                            Establecer contraseña
-                        </a>
+                    <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+                    <p>Usa el siguiente token en la aplicación para completar el cambio:</p>
+                    <p style="font-size: 18px; font-weight: bold; background-color:#f3f4f6; padding:12px; border-radius:4px; word-break:break-all;">
+                        %s
                     </p>
-                    <p>Si el botón no funciona, copia y pega este link en tu navegador:</p>
-                    <p>%s</p>
-                    <p>Este link expira en un tiempo limitado. Si no solicitaste este registro, ignora este correo.</p>
+                    <p>Este token expira en un tiempo limitado. Si no solicitaste este cambio, ignora este correo.</p>
                 </body>
                 </html>
-                """.formatted(nombreUsuario, resetLink, resetLink);
+                """.formatted(nombreUsuario, token);
 
         helper.setText(html, true);
         mailSender.send(mensaje);

@@ -40,7 +40,7 @@ class SupabaseAuthServiceTest {
         UUID id = UUID.randomUUID();
         when(post(anyString())).thenReturn(ResponseEntity.ok(Map.of("id", id.toString())));
         // Act
-        UUID resultado = service.crearUsuarioAuth("a@test.com");
+        UUID resultado = service.crearUsuarioAuth("a@test.com", "Password123!");
         // Assert
         assertEquals(id, resultado);
     }
@@ -51,7 +51,7 @@ class SupabaseAuthServiceTest {
         when(post(anyString())).thenThrow(error(HttpStatus.UNPROCESSABLE_ENTITY));
         // Act
         RecursoDuplicadoException ex = assertThrows(RecursoDuplicadoException.class,
-                () -> service.crearUsuarioAuth("a@test.com"));
+                () -> service.crearUsuarioAuth("a@test.com", "Password123!"));
         // Assert
         assertTrue(ex.getMessage().contains("registrado"));
     }
@@ -61,7 +61,8 @@ class SupabaseAuthServiceTest {
         // Arrange
         when(post(anyString())).thenThrow(error(HttpStatus.FORBIDDEN));
         // Act y Assert
-        assertThrows(IllegalStateException.class, () -> service.crearUsuarioAuth("a@test.com"));
+        assertThrows(IllegalStateException.class,
+                () -> service.crearUsuarioAuth("a@test.com", "Password123!"));
     }
 
     @Test @DisplayName("PU-04-14 Recovery retorna hashed token")

@@ -5,15 +5,20 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import tools.jackson.databind.ObjectMapper;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -24,7 +29,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @EnableMethodSecurity
@@ -32,7 +40,8 @@ public class SecurityConfig {
 
     @Autowired
     private JwtFilter jwtFilter;
-
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -73,7 +82,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers(HttpMethod.POST, "/api/proveedor-servicio/asignar").hasAnyRole("administrador", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/agenda/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
 
@@ -87,28 +102,31 @@ public class SecurityConfig {
             // TEMPORAL: quitar una vez identificada la causa del 403 en Render.
             // Corre después de JwtFilter para mostrar exactamente lo que va a
             // evaluar el AuthorizationFilter (authorizeHttpRequests) al final de la cadena.
-            .addFilterAfter(new RequestLoggingFilter(), JwtFilter.class);
+            .exceptionHandling(exceptions -> exceptions
+                // Sin token válido / no autenticado -> 401 con mensaje claro
+                .authenticationEntryPoint((request, response, authException) -> {
+                response.setStatus(401);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                Map<String, Object> body = new HashMap<>();
+                body.put("timestamp", OffsetDateTime.now().toString());
+                body.put("mensaje", "No autenticado: debes iniciar sesion para acceder a este recurso");
+                response.getWriter().write(objectMapper.writeValueAsString(body));
+            })
+            .accessDeniedHandler((request, response, accessDeniedException) -> {
+                response.setStatus(403);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                Map<String, Object> body = new HashMap<>();
+                body.put("timestamp", OffsetDateTime.now().toString());
+                body.put("mensaje", "No tienes permiso para acceder a este recurso");
+                response.getWriter().write(objectMapper.writeValueAsString(body));
+            }));
+            
         return http.build();
     }
-
-    // TEMPORAL: filtro de diagnóstico. No loguea el valor de Authorization
-    // (solo si está presente) para no exponer JWTs en los logs de Render.
-    private static class RequestLoggingFilter extends OncePerRequestFilter {
-        @Override
-        protected void doFilterInternal(HttpServletRequest request,
-                                         HttpServletResponse response,
-                                         FilterChain filterChain) throws ServletException, IOException {
-            Authentication authAntes = SecurityContextHolder.getContext().getAuthentication();
-            System.out.println("[SECURITY-DEBUG] >>> " + request.getMethod() + " " + request.getRequestURI()
-                    + " | Content-Length=" + request.getContentLength()
-                    + " | Content-Type=" + request.getContentType()
-                    + " | Authorization=" + (request.getHeader("Authorization") != null ? "presente" : "ausente")
-                    + " | authAntesDeAuthorizationFilter=" + (authAntes != null ? authAntes.getClass().getSimpleName() + "/" + authAntes.isAuthenticated() : "null"));
-
-            filterChain.doFilter(request, response);
-
-            System.out.println("[SECURITY-DEBUG] <<< " + request.getMethod() + " " + request.getRequestURI()
-                    + " -> status=" + response.getStatus());
-        }
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            throw new UsernameNotFoundException("Este proyecto no usa autenticación por UserDetailsService");
+        };
     }
 }

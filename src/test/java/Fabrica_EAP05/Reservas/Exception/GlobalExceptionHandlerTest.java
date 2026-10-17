@@ -22,8 +22,8 @@ class GlobalExceptionHandlerTest {
         handler = new GlobalExceptionHandler();
     }
 
-    @Test @DisplayName("CP-01-B - Credenciales inválidas responden 401")
-    void credencialesInvalidas_retornaUnauthorized() {
+    @Test @DisplayName("Credenciales inválidas conservan la respuesta actual 400")
+    void credencialesInvalidas_retornanBadRequest() {
         // Arrange
         IllegalArgumentException excepcion = new IllegalArgumentException("Credenciales inválidas");
 
@@ -32,7 +32,7 @@ class GlobalExceptionHandlerTest {
                 handler.handleIllegalArgument(excepcion);
 
         // Assert
-        assertAll(() -> assertEquals(HttpStatus.UNAUTHORIZED, respuesta.getStatusCode()),
+        assertAll(() -> assertEquals(HttpStatus.BAD_REQUEST, respuesta.getStatusCode()),
                 () -> assertEquals("Credenciales inválidas", respuesta.getBody().get("mensaje")),
                 () -> assertNotNull(respuesta.getBody().get("timestamp")));
     }

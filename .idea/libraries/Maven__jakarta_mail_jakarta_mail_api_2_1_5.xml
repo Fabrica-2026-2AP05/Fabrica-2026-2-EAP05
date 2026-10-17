@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="Maven: jakarta.mail:jakarta.mail-api:2.1.5" type="java-imported" external-system-id="Maven">
+    <properties groupId="jakarta.mail" artifactId="jakarta.mail-api" version="2.1.5" baseVersion="2.1.5" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/jakarta/mail/jakarta.mail-api/2.1.5/jakarta.mail-api-2.1.5-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

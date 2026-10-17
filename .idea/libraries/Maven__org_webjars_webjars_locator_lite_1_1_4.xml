@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="Maven: org.webjars:webjars-locator-lite:1.1.4" type="java-imported" external-system-id="Maven">
+    <properties groupId="org.webjars" artifactId="webjars-locator-lite" version="1.1.4" baseVersion="1.1.4" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/webjars/webjars-locator-lite/1.1.4/webjars-locator-lite-1.1.4.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/webjars/webjars-locator-lite/1.1.4/webjars-locator-lite-1.1.4-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/webjars/webjars-locator-lite/1.1.4/webjars-locator-lite-1.1.4-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

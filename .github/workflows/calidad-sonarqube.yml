@@ -1,0 +1,65 @@
+name: Calidad - Pruebas, JaCoCo y SonarQube
+
+on:
+  push:
+    branches:
+      - calidad
+  pull_request:
+    branches:
+      - calidad
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    name: Pruebas unitarias y analisis de calidad
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - name: Descargar el codigo de la rama
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Dar permisos al wrapper de Maven
+        run: chmod +x mvnw
+
+      - name: Ejecutar pruebas y generar cobertura JaCoCo
+        run: ./mvnw --batch-mode clean verify
+
+      - name: Publicar reporte HTML de JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-jacoco
+          path: target/site/jacoco/
+          if-no-files-found: warn
+
+      - name: Publicar resultados de las pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-pruebas
+          path: target/surefire-reports/
+          if-no-files-found: warn
+
+      - name: Analizar en SonarQube Cloud
+        if: ${{ success() && env.SONAR_TOKEN != '' }}
+        run: >-
+          ./mvnw --batch-mode
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=Fabrica-2026-2AP05
+          -Dsonar.projectKey=Fabrica-2026-2AP05_Fabrica-2026-2-EAP05
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml

@@ -5,6 +5,7 @@ import Fabrica_EAP05.Reservas.DTO.LoginDTO;
 import Fabrica_EAP05.Reservas.DTO.LoginResponseDTO;
 import Fabrica_EAP05.Reservas.Entities.Rol;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
+import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,7 @@ class AuthServiceTest {
     @Mock private TokenBlacklistService tokenBlacklistService;
     @Mock private RestTemplate restTemplate;
     @Mock private SupabaseAuthService supabaseAuthService;
+    @Mock private LoginAttemptService loginAttemptService;
     @InjectMocks private AuthService authService;
     private LoginDTO login;
     private Usuario usuario;
@@ -73,10 +75,13 @@ class AuthServiceTest {
                 .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized", null, null, null));
 
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> authService.login(login));
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> authService.login(login));
 
         // Assert
         assertEquals("Credenciales inválidas", error.getMessage());
+        verify(loginAttemptService).verificarBloqueo(login.getEmail());
+        verify(loginAttemptService, never()).registrarFallo(anyString());
         verifyNoInteractions(usuarioRepository, jwtUtil, inactivityTrackingService);
     }
 
@@ -87,7 +92,8 @@ class AuthServiceTest {
         when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.empty());
 
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> authService.login(login));
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> authService.login(login));
 
         // Assert
         assertEquals("Usuario no encontrado", error.getMessage());
@@ -101,7 +107,8 @@ class AuthServiceTest {
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class))).thenReturn(ResponseEntity.ok("ok"));
         when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.of(usuario));
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> authService.login(login));
+        CredencialesInvalidasException error = assertThrows(CredencialesInvalidasException.class,
+                () -> authService.login(login));
 
         // Assert
         assertEquals("El usuario se encuentra inactivo", error.getMessage());

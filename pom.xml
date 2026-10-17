@@ -122,13 +122,12 @@
                                 <artifactId>maven-compiler-plugin</artifactId>
                                 <version>3.11.0</version>
                                 <configuration>
-                                        <source>21</source>
-                                        <target>21</target>
+                                        <release>21</release>
                                         <annotationProcessorPaths>
                                                 <path>
                                                         <groupId>org.projectlombok</groupId>
                                                         <artifactId>lombok</artifactId>
-                                                        <version>${lombok.version}</version>
+                                                        <version>1.18.42</version>
                                                 </path>
                                         </annotationProcessorPaths>
                                 </configuration>
@@ -162,5 +161,13 @@
                                 </executions>
                         </plugin>
                 </plugins>
+                <resources>
+                        <resource>
+                                <directory>src/main/resources</directory>
+                                <excludes>
+                                        <exclude>application.properties.example</exclude>
+                                </excludes>
+                        </resource>
+                </resources>
         </build>
 </project>

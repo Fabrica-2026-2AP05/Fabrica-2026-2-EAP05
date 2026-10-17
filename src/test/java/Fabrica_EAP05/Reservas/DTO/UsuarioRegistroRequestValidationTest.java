@@ -22,6 +22,7 @@ class UsuarioRegistroRequestValidationTest {
         request = new UsuarioRegistroRequest();
         request.setNombre("Ana Pérez");
         request.setEmail("ana@correo.com");
+        request.setContrasena("Password123!");
         request.setTelefono("3001234567");
         request.setDireccion("Calle 10 # 20-30");
     }
@@ -95,17 +96,24 @@ class UsuarioRegistroRequestValidationTest {
 
     @Test
     @DisplayName("CP-04-B y CP-05-B - Detecta todos los campos vacíos")
-    void todosLosCamposVacios_generanCuatroErrores() {
+    void todosLosCamposVacios_reportanLosCincoCampos() {
         // Arrange
         request.setNombre("");
         request.setEmail("");
+        request.setContrasena("");
         request.setTelefono("");
         request.setDireccion("");
         // Act
         Set<ConstraintViolation<UsuarioRegistroRequest>> resultado = validator.validate(request);
 
         // Assert
-        assertEquals(4, resultado.size());
+        assertAll(
+                () -> assertCampoInvalido(resultado, "nombre"),
+                () -> assertCampoInvalido(resultado, "email"),
+                () -> assertCampoInvalido(resultado, "contrasena"),
+                () -> assertCampoInvalido(resultado, "telefono"),
+                () -> assertCampoInvalido(resultado, "direccion")
+        );
     }
 
     private void assertCampoInvalido(Set<ConstraintViolation<UsuarioRegistroRequest>> resultado, String campo) {

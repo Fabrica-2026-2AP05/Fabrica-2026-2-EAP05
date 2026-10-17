@@ -16,6 +16,7 @@ import Fabrica_EAP05.Reservas.DTO.LoginDTO;
 import Fabrica_EAP05.Reservas.DTO.LoginResponseDTO;
 import Fabrica_EAP05.Reservas.DTO.ResetPasswordRequest;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
+import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
@@ -39,16 +40,36 @@ public class AuthService {
     @Autowired
     private SupabaseAuthService supabaseAuthService;
 
+     @Autowired
+    private MailService mailService;
+
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     @Value("${supabase.url}")
     private String supabaseUrl;
 
     @Value("${supabase.anon-key}")
     private String supabaseAnonKey;
 
+    @Value("${app.frontend.reset-password-url}")
+    private String resetPasswordUrl;
+
     public LoginResponseDTO login(LoginDTO dto) {
 
+        // 0. Verificar si el usuario está bloqueado ANTES de gastar una llamada a Supabase
+        loginAttemptService.verificarBloqueo(dto.getEmail());
+
         // 1. Validar credenciales contra Supabase Auth
-        validarCredencialesSupabase(dto.getEmail(), dto.getContrasena());
+        try {
+            validarCredencialesSupabase(dto.getEmail(), dto.getContrasena());
+        } catch (CredencialesInvalidasException e) {
+            loginAttemptService.registrarFallo(dto.getEmail());
+            throw e;
+        }
+
+        // Login exitoso: resetear contador
+        loginAttemptService.registrarExito(dto.getEmail());
 
         // 2. Buscar perfil local por email
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
@@ -56,7 +77,7 @@ public class AuthService {
 
         // 3. Verificar estado del usuario en tu base de datos
         if (Boolean.FALSE.equals(usuario.getActivo())) {
-            throw new IllegalArgumentException("El usuario se encuentra inactivo");
+            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
         }
 
         // 4. Generar token y registrar actividad
@@ -85,16 +106,24 @@ public class AuthService {
                     String.class
             );
         } catch (HttpClientErrorException e) {
-    System.err.println("Supabase respondió: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-    throw new IllegalArgumentException("Credenciales inválidas");
-}
+            throw new IllegalArgumentException("Credenciales inválidas");
+        }
     }
 
+   public void solicitarRecuperacion(String email) {
+    usuarioRepository.findByEmail(email).ifPresent(usuario -> {
+        try {
+            String token = supabaseAuthService.generarTokenRecovery(email);
+            mailService.enviarEmailResetPassword(email, usuario.getNombre(), token);
+        } catch (Exception e) {
+            System.err.println("[AuthService] No se pudo enviar email de recuperación a "
+                    + email + ": " + e.getMessage());
+        }
+    });
+}
+    
     public void resetPassword(ResetPasswordRequest dto) {
-        usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-        String accessToken = supabaseAuthService.verificarTokenRecovery(dto.getEmail(), dto.getToken());
+        String accessToken = supabaseAuthService.verificarTokenRecovery(dto.getToken());
         supabaseAuthService.actualizarPassword(accessToken, dto.getPassword());
     }
 

@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,12 +27,6 @@ public class UsuarioServiceImpl implements IUsuarioService {
     @Autowired
     private SupabaseAuthService supabaseAuthService;
 
-    @Autowired
-    private MailService mailService;
-
-    @Value("${app.frontend.reset-password-url}")
-    private String resetPasswordUrl;
-
     @Override
     public UsuarioRegistroResponse registrarUsuario(UsuarioRegistroRequest request, Rol rolForzado) {
         if (usuarioRepository.existsByEmail(request.getEmail())) {
@@ -41,8 +34,8 @@ public class UsuarioServiceImpl implements IUsuarioService {
         }
 
         // public.usuario.id tiene FK a auth.users: hay que crear primero el
-        // usuario en Supabase Auth y usar el UUID que Supabase genera.
-        UUID authId = supabaseAuthService.crearUsuarioAuth(request.getEmail());
+        // usuario en Supabase Auth (ya con password) y usar el UUID que Supabase genera.
+        UUID authId = supabaseAuthService.crearUsuarioAuth(request.getEmail(), request.getContrasena());
 
         Usuario usuario = new Usuario();
         usuario.setId(authId);
@@ -67,8 +60,6 @@ public class UsuarioServiceImpl implements IUsuarioService {
             throw e;
         }
 
-        enviarEmailResetPasswordBestEffort(recargado);
-
         return new UsuarioRegistroResponse(
                 recargado.getId(),
                 recargado.getNombre(),
@@ -78,18 +69,5 @@ public class UsuarioServiceImpl implements IUsuarioService {
                 recargado.getRol(),
                 recargado.getCreatedAt()
         );
-    }
-
-    // Best-effort: si Mailtrap falla, el registro ya se guardó y no se
-    // revierte. El usuario puede pedir reenvío del link más adelante.
-    private void enviarEmailResetPasswordBestEffort(Usuario usuario) {
-        try {
-            String token = supabaseAuthService.generarTokenRecovery(usuario.getEmail());
-            String link = resetPasswordUrl + "?token=" + token;
-            mailService.enviarEmailResetPassword(usuario.getEmail(), usuario.getNombre(), link);
-        } catch (Exception e) {
-            System.err.println("[UsuarioServiceImpl] No se pudo enviar email de reset password a "
-                    + usuario.getEmail() + ": " + e.getMessage());
-        }
     }
 }

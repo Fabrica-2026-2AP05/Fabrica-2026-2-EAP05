@@ -6,7 +6,6 @@ import Fabrica_EAP05.Reservas.Entities.Rol;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
-import jakarta.mail.MessagingException;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,18 +29,17 @@ class UsuarioServiceImplTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private EntityManager entityManager;
     @Mock private SupabaseAuthService supabaseAuthService;
-    @Mock private MailService mailService;
     @InjectMocks private UsuarioServiceImpl usuarioService;
     private UsuarioRegistroRequest request;
     private UUID authId;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(usuarioService, "resetPasswordUrl", "https://frontend.test/reset-password");
         authId = UUID.randomUUID();
         request = new UsuarioRegistroRequest();
         request.setNombre("Ana Pérez");
         request.setEmail("ana@correo.com");
+        request.setContrasena("Password123!");
         request.setTelefono("3001234567");
         request.setDireccion("Calle 10 # 20-30");
     }
@@ -61,7 +59,6 @@ class UsuarioServiceImplTest {
                 () -> assertEquals(request.getEmail(), respuesta.getEmail()),
                 () -> assertEquals(Rol.cliente, respuesta.getRol()),
                 () -> assertTrue(captor.getValue().getActivo()));
-        verify(mailService).enviarEmailResetPassword(eq(request.getEmail()), eq(request.getNombre()), contains("token-recovery"));
     }
 
     @Test @DisplayName("CP-04-C y CP-05-C - Rechaza correo duplicado")
@@ -75,41 +72,39 @@ class UsuarioServiceImplTest {
 
         // Assert
         assertEquals("El email ya está registrado", error.getMessage());
-        verifyNoInteractions(supabaseAuthService, entityManager, mailService);
+        verifyNoInteractions(supabaseAuthService, entityManager);
     }
 
     @Test @DisplayName("CP-04-C - Evita usuario huérfano si falla guardado local")
     void registrarUsuario_fallaGuardadoLocal_eliminaUsuarioAuth() {
         // Arrange
         when(usuarioRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(supabaseAuthService.crearUsuarioAuth(request.getEmail())).thenReturn(authId);
+        when(supabaseAuthService.crearUsuarioAuth(request.getEmail(), request.getContrasena())).thenReturn(authId);
         when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenThrow(new RuntimeException("Error de base de datos"));
         // Act
         assertThrows(RuntimeException.class, () -> usuarioService.registrarUsuario(request, Rol.cliente));
 
         // Assert
         verify(supabaseAuthService).eliminarUsuarioAuth(authId);
-        verifyNoInteractions(mailService);
     }
 
-    @Test @DisplayName("CP-04-A y CP-05-A - Conserva registro si falla correo")
-    void registrarUsuario_fallaCorreo_conservaUsuarioRegistrado() throws Exception {
+    @Test @DisplayName("CP-05-A - Registra proveedor con el rol forzado")
+    void registrarUsuario_proveedorValido_asignaRolProveedor() {
         // Arrange
         prepararRegistroExitoso(Rol.proveedor);
-        doThrow(new MessagingException("Servidor de correo no disponible"))
-                .when(mailService).enviarEmailResetPassword(anyString(), anyString(), anyString());
         // Act
-        UsuarioRegistroResponse respuesta = assertDoesNotThrow(() -> usuarioService.registrarUsuario(request, Rol.proveedor));
+        UsuarioRegistroResponse respuesta = usuarioService.registrarUsuario(request, Rol.proveedor);
 
         // Assert
         assertEquals(authId, respuesta.getId());
+        assertEquals(Rol.proveedor, respuesta.getRol());
         verify(usuarioRepository).saveAndFlush(any(Usuario.class));
         verify(supabaseAuthService, never()).eliminarUsuarioAuth(any());
     }
 
     private void prepararRegistroExitoso(Rol rol) {
         when(usuarioRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(supabaseAuthService.crearUsuarioAuth(request.getEmail())).thenReturn(authId);
+        when(supabaseAuthService.crearUsuarioAuth(request.getEmail(), request.getContrasena())).thenReturn(authId);
         when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(usuarioRepository.findById(authId)).thenAnswer(invocation -> {
             Usuario usuario = new Usuario();
@@ -118,6 +113,5 @@ class UsuarioServiceImplTest {
             usuario.setRol(rol); usuario.setActivo(true);
             return Optional.of(usuario);
         });
-        when(supabaseAuthService.generarTokenRecovery(request.getEmail())).thenReturn("token-recovery");
     }
 }

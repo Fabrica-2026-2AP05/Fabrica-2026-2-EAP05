@@ -36,7 +36,7 @@ class MailServiceTest {
         mailService.enviarEmailResetPassword("a@test.com", "Ana", enlace);
         // Assert
         verify(mailSender).send(mensaje);
-        assertEquals("Establece tu contraseña - Fabrica EAP05", mensaje.getSubject());
+        assertEquals("Recuperación de contraseña - Fabrica EAP05", mensaje.getSubject());
         assertEquals("a@test.com", mensaje.getAllRecipients()[0].toString());
         assertTrue(mensaje.getContent().toString().contains(enlace));
     }

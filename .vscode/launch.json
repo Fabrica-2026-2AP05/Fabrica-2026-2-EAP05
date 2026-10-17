@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-ReservasApplication<Reservas>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "Fabrica_EAP05.Reservas.ReservasApplication",
+            "projectName": "Reservas",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
