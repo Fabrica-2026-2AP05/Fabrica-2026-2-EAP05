@@ -68,3 +68,4 @@ jobs:
           -Dsonar.organization=fabrica-2026-2ap05
           -Dsonar.projectKey=Fabrica-2026-2AP05_Fabrica-2026-2-EAP05
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+          -Dsonar.qualitygate.wait=true
