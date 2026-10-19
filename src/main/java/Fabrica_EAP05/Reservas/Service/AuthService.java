@@ -16,6 +16,7 @@ import Fabrica_EAP05.Reservas.DTO.LoginDTO;
 import Fabrica_EAP05.Reservas.DTO.LoginResponseDTO;
 import Fabrica_EAP05.Reservas.DTO.ResetPasswordRequest;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
+import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
@@ -62,7 +63,7 @@ public class AuthService {
         // 1. Validar credenciales contra Supabase Auth
         try {
             validarCredencialesSupabase(dto.getEmail(), dto.getContrasena());
-        } catch (IllegalArgumentException e) {
+        } catch (CredencialesInvalidasException e) {
             loginAttemptService.registrarFallo(dto.getEmail());
             throw e;
         }
@@ -72,11 +73,10 @@ public class AuthService {
 
         // 2. Buscar perfil local por email
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
+        .orElseThrow(() -> new CredencialesInvalidasException("Usuario no encontrado"));        
         // 3. Verificar estado del usuario en tu base de datos
         if (Boolean.FALSE.equals(usuario.getActivo())) {
-            throw new IllegalArgumentException("El usuario se encuentra inactivo");
+            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
         }
 
         // 4. Generar token y registrar actividad

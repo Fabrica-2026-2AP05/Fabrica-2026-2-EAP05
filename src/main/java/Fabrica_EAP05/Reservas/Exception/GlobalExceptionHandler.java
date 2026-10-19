@@ -28,10 +28,7 @@ public class GlobalExceptionHandler {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", OffsetDateTime.now());
         body.put("mensaje", ex.getMessage());
-
-        // Credenciales inválidas / usuario no encontrado -> 401
-        // Usuario inactivo -> podrías diferenciar si quieres, pero 401 es razonable para todo login
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -86,20 +83,35 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
     @ExceptionHandler(org.springframework.dao.DataAccessException.class)
-public ResponseEntity<Map<String, Object>> handleDataAccess(org.springframework.dao.DataAccessException ex) {
-    String causa = String.valueOf(ex.getMostSpecificCause().getMessage());
-    Map<String, Object> body = new HashMap<>();
-    body.put("timestamp", OffsetDateTime.now());
+    public ResponseEntity<Map<String, Object>> handleDataAccess(org.springframework.dao.DataAccessException ex) {
+        String causa = String.valueOf(ex.getMostSpecificCause().getMessage());
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
 
-    if (causa.contains("faltan menos de 12 horas")) {
-        body.put("mensaje", "No se puede cancelar: faltan menos de 12 horas para el inicio de la reserva");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        if (causa.contains("faltan menos de 12 horas")) {
+            body.put("mensaje", "No se puede cancelar: faltan menos de 12 horas para el inicio de la reserva");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+        if (causa.contains("uq_horario_confirmado")) {
+            body.put("mensaje", "El horario ya fue reservado por otro cliente");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+        body.put("mensaje", "Error interno del servidor");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
-    if (causa.contains("uq_horario_confirmado")) {
-        body.put("mensaje", "El horario ya fue reservado por otro cliente");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<Map<String, Object>> handleCredencialesInvalidas(CredencialesInvalidasException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("mensaje", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
-    body.put("mensaje", "Error interno del servidor");
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
-}
+
+    @ExceptionHandler(UsuarioInactivoException.class)
+    public ResponseEntity<Map<String, Object>> handleUsuarioInactivo(UsuarioInactivoException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("mensaje", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
 }

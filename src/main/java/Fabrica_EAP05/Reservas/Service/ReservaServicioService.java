@@ -19,6 +19,7 @@ import Fabrica_EAP05.Reservas.Entities.Servicio;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
 import Fabrica_EAP05.Reservas.Enums.EstadoHorario;
 import Fabrica_EAP05.Reservas.Enums.EstadoReserva;
+import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
 import Fabrica_EAP05.Reservas.Repository.DisponibilidadRecursoRepository;
 import Fabrica_EAP05.Reservas.Repository.HorarioRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
@@ -60,14 +61,14 @@ public class ReservaServicioService {
         Usuario cliente = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
         if (!Boolean.TRUE.equals(cliente.getActivo())) {
-            throw new IllegalArgumentException("El usuario no está activo");
+            throw new UsuarioInactivoException("El usuario no está activo");
         }
 
         // 2. Servicio existe y está activo
         Servicio servicio = servicioRepository.findById(request.getServicioId())
                 .orElseThrow(() -> new IllegalArgumentException("El servicio no existe"));
         if (!Boolean.TRUE.equals(servicio.getActivo())) {
-            throw new IllegalArgumentException("El servicio no está activo");
+            throw new UsuarioInactivoException("El usuario no está activo");
         }
 
         // 3. Horario existe (bloqueado para escritura hasta el fin de la transacción)
@@ -139,7 +140,7 @@ public class ReservaServicioService {
     Usuario cliente = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
     if (!Boolean.TRUE.equals(cliente.getActivo())) {
-        throw new IllegalArgumentException("El usuario no está activo");
+        throw new UsuarioInactivoException("El usuario no está activo");
     }
 
     // Mismo mensaje si no existe o es de otro cliente: no se revela cuál de las dos
