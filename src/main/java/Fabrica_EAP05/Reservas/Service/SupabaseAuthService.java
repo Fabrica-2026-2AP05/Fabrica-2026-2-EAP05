@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 
 // Usa el Admin API de Supabase (requiere la service_role key, nunca la anon
@@ -131,16 +132,16 @@ public class SupabaseAuthService {
 
         Map<String, Object> responseBody = response.getBody();
         if (responseBody == null) {
-            throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
         }
 
         Object accessToken = responseBody.get("access_token");
         if (accessToken == null) {
-            throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
         }
         return accessToken.toString();
     } catch (HttpClientErrorException e) {
-        throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+        throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
     }
     }
 
