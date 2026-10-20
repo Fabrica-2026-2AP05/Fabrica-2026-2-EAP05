@@ -122,10 +122,44 @@
                                 <artifactId>maven-compiler-plugin</artifactId>
                                 <version>3.11.0</version>
                                 <configuration>
-                                        <source>21</source>
-                                        <target>21</target>
+                                        <release>21</release>
+                                        <annotationProcessorPaths>
+                                                <path>
+                                                        <groupId>org.projectlombok</groupId>
+                                                        <artifactId>lombok</artifactId>
+                                                        <version>1.18.42</version>
+                                                </path>
+                                        </annotationProcessorPaths>
                                 </configuration>
-                                </plugin>
+                        </plugin>
+                        <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-surefire-plugin</artifactId>
+                                <version>3.5.6</version>
+                                <configuration>
+                                        <useFile>false</useFile>
+                                        <reportFormat>plain</reportFormat>
+                                </configuration>
+                        </plugin>
+                        <plugin>
+                                <groupId>org.jacoco</groupId>
+                                <artifactId>jacoco-maven-plugin</artifactId>
+                                <version>0.8.14</version>
+                                <executions>
+                                        <execution>
+                                                <goals>
+                                                        <goal>prepare-agent</goal>
+                                                </goals>
+                                        </execution>
+                                        <execution>
+                                                <id>report</id>
+                                                <phase>verify</phase>
+                                                <goals>
+                                                        <goal>report</goal>
+                                                </goals>
+                                        </execution>
+                                </executions>
+                        </plugin>
                 </plugins>
                 <resources>
                         <resource>

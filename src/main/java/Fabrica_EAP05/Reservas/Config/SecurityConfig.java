@@ -85,13 +85,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
-                    // Dentro de SecurityConfig / HttpSecurity:
-                    .requestMatchers(HttpMethod.POST, "/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    // RESTRICCIÓN ESPECÍFICA DE ROL:
-                    .requestMatchers(HttpMethod.POST, "/api/proveedor-servicio/asignar").hasAnyRole("administrador", "ADMIN")
-                    .requestMatchers(HttpMethod.GET, "/api/agenda/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    .requestMatchers("/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    .requestMatchers("/error").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers(HttpMethod.POST, "/api/proveedor-servicio/asignar").hasAnyRole("administrador", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/agenda/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )

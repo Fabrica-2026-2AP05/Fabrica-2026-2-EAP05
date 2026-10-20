@@ -105,8 +105,8 @@ public class AuthService {
                     String.class
             );
         } catch (HttpClientErrorException e) {
-    throw new IllegalArgumentException("Credenciales inválidas");
-}
+            throw new IllegalArgumentException("Credenciales inválidas");
+        }
     }
 
    public void solicitarRecuperacion(String email) {

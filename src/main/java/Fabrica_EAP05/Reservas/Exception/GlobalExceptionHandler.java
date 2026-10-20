@@ -114,4 +114,7 @@ public class GlobalExceptionHandler {
         body.put("mensaje", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
+    body.put("mensaje", "Error interno del servidor");
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+}
 }
