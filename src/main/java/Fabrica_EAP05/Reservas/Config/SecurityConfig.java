@@ -65,8 +65,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. Desactivar CSRF (necesario para APIs REST sin sesión)
-            .csrf(csrf -> csrf.disable())
+            // 1. Desactivar CSRF intencionalmente para API REST Stateless
+            .csrf(csrf -> csrf
+                    .ignoringRequestMatchers("/api/**", "/swagger-ui/**", "/v3/api-docs/**")
+            )
 
             // 2. Habilitar CORS con la configuración de arriba
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))

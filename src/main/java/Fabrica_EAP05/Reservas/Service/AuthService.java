@@ -73,8 +73,7 @@ public class AuthService {
 
         // 2. Buscar perfil local por email
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
+        .orElseThrow(() -> new CredencialesInvalidasException("Usuario no encontrado"));        
         // 3. Verificar estado del usuario en tu base de datos
         if (Boolean.FALSE.equals(usuario.getActivo())) {
             throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
