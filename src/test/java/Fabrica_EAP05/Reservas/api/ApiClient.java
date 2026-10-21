@@ -7,9 +7,12 @@ import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.apache.http.params.CoreConnectionPNames;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 public class ApiClient {
 
-    private static RequestSpecification baseRequest() {
+    static RequestSpecification baseRequest() {
         int timeout = (int) ApiTestConfig.getTimeoutMs();
         RestAssuredConfig config = RestAssured.config()
                 .httpClient(HttpClientConfig.httpClientConfig()
@@ -32,7 +35,7 @@ public class ApiClient {
                 .post("/api/auth/login");
         long ms = System.currentTimeMillis() - start;
 
-        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/auth/login", body, res.getStatusCode(), res.getBody().asString(), ms);
+        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/auth/login", body, res.getStatusCode(), cuerpo(res), ms);
         return res;
     }
 
@@ -45,7 +48,7 @@ public class ApiClient {
                 .post("/api/usuario/registrar");
         long ms = System.currentTimeMillis() - start;
 
-        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/usuario/registrar", bodyJson, res.getStatusCode(), res.getBody().asString(), ms);
+        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/usuario/registrar", bodyJson, res.getStatusCode(), cuerpo(res), ms);
         return res;
     }
 
@@ -63,7 +66,7 @@ public class ApiClient {
         long ms = System.currentTimeMillis() - start;
 
         String loggedReq = (token != null ? "Header Authorization: Bearer " + token + "\n" : "") + (bodyJson != null ? bodyJson : "");
-        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/usuario/registrar/proveedor", loggedReq, res.getStatusCode(), res.getBody().asString(), ms);
+        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/usuario/registrar/proveedor", loggedReq, res.getStatusCode(), cuerpo(res), ms);
         return res;
     }
 
@@ -78,7 +81,7 @@ public class ApiClient {
         long ms = System.currentTimeMillis() - start;
 
         String loggedReq = (token != null ? "Header Authorization: Bearer " + token : "Sin Header Authorization");
-        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/auth/logout", loggedReq, res.getStatusCode(), res.getBody().asString(), ms);
+        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/auth/logout", loggedReq, res.getStatusCode(), cuerpo(res), ms);
         return res;
     }
 
@@ -95,8 +98,39 @@ public class ApiClient {
         long ms = System.currentTimeMillis() - start;
 
         String loggedReq = (token != null ? "Header Authorization: Bearer " + token + "\n" : "") + "{}";
-        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/reservas/reservar", loggedReq, res.getStatusCode(), res.getBody().asString(), ms);
+        EvidenciaRecorder.registrarPaso(paso, "POST", "/api/reservas/reservar", loggedReq, res.getStatusCode(), cuerpo(res), ms);
         return res;
+    }
+
+    /**
+     * Decodifica el cuerpo con el charset que declara la respuesta (Content-Type) y, si no declara
+     * ninguno, con UTF-8 si es JSON o ISO-8859-1 en otro caso (valor por defecto de la API Servlet).
+     * Así el texto que se compara es exactamente el que recibiría cualquier cliente HTTP.
+     */
+    public static String cuerpo(Response res) {
+        byte[] bytes = res.getBody().asByteArray();
+        return new String(bytes, charsetDe(res.getHeader("Content-Type")));
+    }
+
+    static Charset charsetDe(String contentType) {
+        if (contentType != null) {
+            for (String parte : contentType.split(";")) {
+                String p = parte.trim();
+                if (p.regionMatches(true, 0, "charset=", 0, 8)) {
+                    try {
+                        return Charset.forName(p.substring(8).replace("\"", "").trim());
+                    } catch (Exception e) {
+                        System.err.println("[ApiClient] Charset no reconocido '" + p + "', se usa ISO-8859-1");
+                    }
+                }
+            }
+            // JSON sin charset es UTF-8 por definición (RFC 8259)
+            String tipo = contentType.split(";")[0].trim().toLowerCase();
+            if (tipo.equals("application/json") || tipo.endsWith("+json")) {
+                return StandardCharsets.UTF_8;
+            }
+        }
+        return StandardCharsets.ISO_8859_1;
     }
 
     public static String obtenerTokenAdmin() {

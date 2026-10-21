@@ -1,6 +1,5 @@
 package Fabrica_EAP05.Reservas.api;
 
-import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,7 +47,8 @@ public class ApiTestConfig {
                 try (FileInputStream fis = new FileInputStream(propFile);
                      InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8)) {
                     fileProps.load(isr);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    System.err.println("[ApiTestConfig] No se pudo leer api-tests.properties: " + e.getMessage());
                 }
             }
             propsLoaded = true;
@@ -108,9 +108,7 @@ public class ApiTestConfig {
         while (System.currentTimeMillis() < deadline) {
             intento++;
             try {
-                Response res = RestAssured.given()
-                        .baseUri(baseUrl)
-                        .relaxedHTTPSValidation()
+                Response res = ApiClient.baseRequest()
                         .when()
                         .get("/v3/api-docs");
 
@@ -162,9 +160,7 @@ public class ApiTestConfig {
         }
 
         try {
-            Response res = RestAssured.given()
-                    .baseUri(baseUrl)
-                    .relaxedHTTPSValidation()
+            Response res = ApiClient.baseRequest()
                     .contentType("application/json")
                     .body(DatosPrueba.bodyLogin(adminEmail, adminPassword))
                     .post("/api/auth/login");
