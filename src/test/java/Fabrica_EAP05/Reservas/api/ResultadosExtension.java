@@ -13,9 +13,9 @@ import java.util.*;
 
 public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
 
-    private static final Map<String, ResultadoCP> resultados = new LinkedHashMap<>();
+    // TreeMap: los reportes salen ordenados por CP (CP-01-A ... CP-05-F), no por orden de ejecución
+    private static final Map<String, ResultadoCP> resultados = new TreeMap<>();
     private static final Map<String, Integer> FILAS_EXCEL = new HashMap<>();
-    private static boolean shutdownHookRegistered = false;
 
     static {
         // HU01
@@ -45,19 +45,14 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
         FILAS_EXCEL.put("CP-05-D", 862);
         FILAS_EXCEL.put("CP-05-E", 905);
         FILAS_EXCEL.put("CP-05-F", 948);
-
-        registrarShutdownHook();
-    }
-
-    private static synchronized void registrarShutdownHook() {
-        if (!shutdownHookRegistered) {
-            Runtime.getRuntime().addShutdownHook(new Thread(ResultadosExtension::generarReportes));
-            shutdownHookRegistered = true;
-        }
     }
 
     @Override
     public void beforeEach(ExtensionContext context) {
+        // JUnit cierra los AutoCloseable del store raíz una sola vez, al terminar todas las clases y antes de que
+        // Surefire cierre el JVM (un shutdown hook dejaba la consola truncada y los archivos en riesgo).
+        context.getRoot().getStore(ExtensionContext.Namespace.create(ResultadosExtension.class))
+                .computeIfAbsent("reportes", k -> (AutoCloseable) ResultadosExtension::generarReportes, AutoCloseable.class);
         Method method = context.getRequiredTestMethod();
         CasoPrueba cpAnno = method.getAnnotation(CasoPrueba.class);
         if (cpAnno != null) {
@@ -85,7 +80,7 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
         if (cp != null) {
             cp.setEstado("NO PASA");
             if (cause != null) {
-                cp.addFalla(cause.getMessage() != null ? cause.getMessage() : cause.toString());
+                cp.addFalla(EvidenciaRecorder.enmascarar(cause.getMessage() != null ? cause.getMessage() : cause.toString()));
                 if (!(cause instanceof AssertionError)) {
                     cp.setErrorDePrueba(true);
                 }
@@ -177,6 +172,22 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
         cp.setExcel(excel);
     }
 
+    /** true si todas las aserciones fallidas son textos que solo difieren por caracteres mal decodificados (U+FFFD). */
+    private static boolean soloFallaPorCodificacion(ResultadoCP cp) {
+        boolean alguna = false;
+        for (String falla : cp.getFallas()) {
+            for (String linea : falla.split("\n")) {
+                if (linea.contains("AssertionFailedError")) {
+                    if (!linea.contains("�")) {
+                        return false;
+                    }
+                    alguna = true;
+                }
+            }
+        }
+        return alguna;
+    }
+
     private static String extraerResumenMensaje(String body) {
         if (body == null || body.trim().isEmpty()) return null;
         String trimmed = body.trim();
@@ -223,13 +234,18 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
             severidad = "Media";
             claseSospechosa = "AuthService.validarCredencialesSupabase / GlobalExceptionHandler (a confirmar por Backend)";
         } else if ("CP-01-C".equals(cp.getCp())) {
-            titulo = "[HU01] Bloqueo temporal por múltiples intentos fallidos no se activa tras 5 intentos";
+            titulo = "[HU01] El bloqueo tras 5 intentos fallidos no se activa";
             severidad = "Alta";
             claseSospechosa = "AuthService.login / LoginAttemptService (a confirmar por Backend)";
         } else if ("CP-01-F".equals(cp.getCp())) {
-            titulo = "[HU01] Login de usuario inactivo responde 500 en lugar de 401";
+            titulo = "[HU01] Login de usuario inactivo responde " + cp.getHttpObtenido() + " en lugar de 401";
             severidad = "Media";
-            claseSospechosa = "GlobalExceptionHandler (falta @ExceptionHandler para CredencialesInvalidasException) (a confirmar por Backend)";
+            claseSospechosa = "500 sugiere que falta @ExceptionHandler(CredencialesInvalidasException) en GlobalExceptionHandler (a confirmar por Backend)";
+        } else if (("CP-03-B".equals(cp.getCp()) || "CP-03-C".equals(cp.getCp())) && soloFallaPorCodificacion(cp)) {
+            titulo = "[HU03] Las respuestas 401 de JwtFilter no declaran charset (las tildes se ven mal en clientes UTF-8)";
+            severidad = "Baja";
+            claseSospechosa = "JwtFilter: escribe con getWriter() sin setContentType/setCharacterEncoding; Tomcat codifica en ISO-8859-1 "
+                    + "y Render entrega 'text/plain; charset=utf-8' (a confirmar por Backend)";
         } else {
             titulo = "[" + cp.getHu() + "] " + cp.getTitulo() + " responde HTTP " + cp.getHttpObtenido() + " en lugar del esperado";
         }
@@ -245,7 +261,7 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
                     .append("  - Body recibido:\n    ```json\n    ").append(p.getResponseBody() != null ? p.getResponseBody().replace("\n", "\n    ") : "").append("\n    ```\n");
         }
 
-        String actual = "HTTP " + cp.getHttpObtenido() + (cause != null ? ": " + cause.getMessage() : "");
+        String actual = "HTTP " + cp.getHttpObtenido() + (cause != null ? ": " + EvidenciaRecorder.enmascarar(cause.getMessage()) : "");
         String esperado = cp.getEsperado();
 
         return new ResultadoCP.BugInfo(titulo, cp.getHu(), cp.getCp(), repro.toString(), actual, esperado, severidad, claseSospechosa);
@@ -493,11 +509,11 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
             writer.write("- **Detalle:** En `GlobalExceptionHandler.java`, líneas 117–120, después del método `handleUsuarioInactivo` quedaron dos sentencias sueltas fuera de cualquier método:\n");
             writer.write("  ```java\n");
             writer.write("  body.put(\"mensaje\", \"Error interno del servidor\");\n");
-            writer.write("  return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);\n");
+            writer.write("  return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);\n");
             writer.write("  ```\n");
             writer.write("  Son restos sintácticos de la resolución de fusión de ramas.\n");
             writer.write("- **Responsable sugerido:** Backend (autor del merge 263a0aa del 20/10/2026).\n");
-            writer.write("- **Comprobación:** Confirmado en `origin/Sprint-1`. No se modifica ni corrige en esta suite según la regla de §9.\n");
+            writer.write("- **Comprobación:** Confirmado en `origin/Sprint-1` (263a0aa) con `git show origin/Sprint-1:src/main/java/Fabrica_EAP05/Reservas/Exception/GlobalExceptionHandler.java`. No se modifica ni corrige en esta suite según la regla de §9.\n");
         } catch (Exception e) {
             System.err.println("[ResultadosExtension] Error escribiendo bugs markdown: " + e.getMessage());
         }
