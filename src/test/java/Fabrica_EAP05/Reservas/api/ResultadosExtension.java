@@ -240,7 +240,7 @@ public class ResultadosExtension implements BeforeEachCallback, TestWatcher {
         } else if ("CP-01-F".equals(cp.getCp())) {
             titulo = "[HU01] Login de usuario inactivo responde " + cp.getHttpObtenido() + " en lugar de 401";
             severidad = "Media";
-            claseSospechosa = "500 sugiere que falta @ExceptionHandler(CredencialesInvalidasException) en GlobalExceptionHandler (a confirmar por Backend)";
+            claseSospechosa = "Causa probable: las ramas calidad y Sprint-2 no tienen @ExceptionHandler(CredencialesInvalidasException) en GlobalExceptionHandler (a confirmar por Backend)";
         } else if (("CP-03-B".equals(cp.getCp()) || "CP-03-C".equals(cp.getCp())) && soloFallaPorCodificacion(cp)) {
             titulo = "[HU03] Las respuestas 401 de JwtFilter no declaran charset (las tildes se ven mal en clientes UTF-8)";
             severidad = "Baja";
