@@ -33,7 +33,7 @@ public class HU04RegistroClienteApiTest {
 
         String email = DatosPrueba.generarEmail("cp04a", 1);
         String nombre = "Ana Pérez";
-        String telefono = "3001234567";
+        String telefono = "3009876543";
         String direccion = "Calle 10 #20-30";
 
         String body = DatosPrueba.bodyRegistro(nombre, email, DatosPrueba.DEFAULT_PASSWORD, telefono, direccion);
@@ -55,6 +55,7 @@ public class HU04RegistroClienteApiTest {
         // Verificación BD si está configurada
         Boolean activoBd = DbVerifier.isConfigured() ? DbVerifier.isActivo(email) : null;
 
+        EvidenciaRecorder.principal(reg, login);
         assertAll("Aserciones CP-04-A",
                 () -> assertEquals(201, reg.getStatusCode(), "Código HTTP esperado 201"),
                 () -> assertNotNull(id, "El id no debe ser nulo"),
@@ -89,16 +90,16 @@ public class HU04RegistroClienteApiTest {
         // Variante 1: omitir nombre
         String emailV1 = DatosPrueba.generarEmail("cp04b", 1);
         Response res1 = ApiClient.registrarCliente("Variante 1: sin nombre",
-                DatosPrueba.bodyRegistro(null, emailV1, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro(null, emailV1, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
         // Variante 2: omitir email
         Response res2 = ApiClient.registrarCliente("Variante 2: sin email",
-                DatosPrueba.bodyRegistro("Nombre V2", null, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre V2", null, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
         // Variante 3: omitir contrasena
         String emailV3 = DatosPrueba.generarEmail("cp04b", 3);
         Response res3 = ApiClient.registrarCliente("Variante 3: sin contrasena",
-                DatosPrueba.bodyRegistro("Nombre V3", emailV3, null, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre V3", emailV3, null, "3009876543", "Calle 1 # 2-3"));
 
         // Variante 4: omitir telefono
         String emailV4 = DatosPrueba.generarEmail("cp04b", 4);
@@ -108,22 +109,23 @@ public class HU04RegistroClienteApiTest {
         // Variante 5: omitir direccion
         String emailV5 = DatosPrueba.generarEmail("cp04b", 5);
         Response res5 = ApiClient.registrarCliente("Variante 5: sin direccion",
-                DatosPrueba.bodyRegistro("Nombre V5", emailV5, DatosPrueba.DEFAULT_PASSWORD, "3001234567", null));
+                DatosPrueba.bodyRegistro("Nombre V5", emailV5, DatosPrueba.DEFAULT_PASSWORD, "3009876543", null));
 
         // Variante 6: email inválido
         Response res6 = ApiClient.registrarCliente("Variante 6: email invalido",
-                DatosPrueba.bodyRegistro("Nombre V6", "correo-invalido", DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre V6", "correo-invalido", DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
         // Verificaciones §5.3 de que los correos válidos no quedaron creados
         Response verifV1 = ApiClient.registrarCliente("Verificación §5.3 para Variante 1",
-                DatosPrueba.bodyRegistro("Nombre Completo V1", emailV1, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre Completo V1", emailV1, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         Response verifV3 = ApiClient.registrarCliente("Verificación §5.3 para Variante 3",
-                DatosPrueba.bodyRegistro("Nombre Completo V3", emailV3, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre Completo V3", emailV3, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         Response verifV4 = ApiClient.registrarCliente("Verificación §5.3 para Variante 4",
-                DatosPrueba.bodyRegistro("Nombre Completo V4", emailV4, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre Completo V4", emailV4, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         Response verifV5 = ApiClient.registrarCliente("Verificación §5.3 para Variante 5",
-                DatosPrueba.bodyRegistro("Nombre Completo V5", emailV5, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Nombre Completo V5", emailV5, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
+        EvidenciaRecorder.principal(res1, res2, res3, res4, res5, res6);
         assertAll("Aserciones CP-04-B (6 variantes)",
                 () -> assertEquals(400, res1.getStatusCode(), "Variante 1 debe responder 400"),
                 () -> assertEquals("El nombre es obligatorio", res1.jsonPath().getString("errores.nombre"),
@@ -165,7 +167,7 @@ public class HU04RegistroClienteApiTest {
         }
 
         String email = DatosPrueba.generarEmail("cp04c", 1);
-        String body = DatosPrueba.bodyRegistro("Cliente CP04C", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3");
+        String body = DatosPrueba.bodyRegistro("Cliente CP04C", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3");
 
         // Primer registro exitoso
         Response reg1 = ApiClient.registrarCliente("Primer registro de cliente", body);
@@ -178,6 +180,7 @@ public class HU04RegistroClienteApiTest {
         boolean mensajeValido = "El email ya está registrado".equals(mensaje)
                 || "El email ya está registrado en Supabase Auth".equals(mensaje);
 
+        EvidenciaRecorder.principal(reg2);
         assertAll("Aserciones CP-04-C",
                 () -> assertEquals(409, reg2.getStatusCode(), "La segunda petición debe responder 409 Conflict"),
                 () -> assertTrue(mensajeValido, "El mensaje debe ser 'El email ya está registrado' o 'El email ya está registrado en Supabase Auth'. Recibido: " + mensaje)
@@ -196,17 +199,18 @@ public class HU04RegistroClienteApiTest {
         // Variante (a): contraseña de 5 caracteres "Qa123"
         String emailA = DatosPrueba.generarEmail("cp04d", 1);
         Response resA = ApiClient.registrarCliente("Variante (a): contraseña de 5 caracteres Qa123",
-                DatosPrueba.bodyRegistro("Cliente CP04D A", emailA, "Qa123", "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP04D A", emailA, "Qa123", "3009876543", "Calle 1 # 2-3"));
 
         // Verificación §5.3: la cuenta no queda creada
         Response verifA = ApiClient.registrarCliente("Verificación §5.3: registrar después con clave de 6 caracteres",
-                DatosPrueba.bodyRegistro("Cliente CP04D A", emailA, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP04D A", emailA, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
         // Variante (b): contraseña de 6 caracteres con otro correo nuevo
         String emailB = DatosPrueba.generarEmail("cp04d", 2);
         Response resB = ApiClient.registrarCliente("Variante (b): contraseña de 6 caracteres Qa1234",
-                DatosPrueba.bodyRegistro("Cliente CP04D B", emailB, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP04D B", emailB, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
 
+        EvidenciaRecorder.principal(resA, resB);
         assertAll("Aserciones CP-04-D",
                 () -> assertEquals(400, resA.getStatusCode(), "Variante (a) debe responder 400"),
                 () -> assertEquals("La contraseña debe tener como mínimo 6 caracteres", resA.jsonPath().getString("errores.contrasena"),
@@ -228,7 +232,7 @@ public class HU04RegistroClienteApiTest {
         }
 
         String email = DatosPrueba.generarEmail("cp04e", 1);
-        String bodyConRolAdmin = DatosPrueba.bodyRegistroConRol("Cliente CP04E", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3", "administrador");
+        String bodyConRolAdmin = DatosPrueba.bodyRegistroConRol("Cliente CP04E", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3", "administrador");
 
         // 1. Registro con rol administrador en el body
         Response reg = ApiClient.registrarCliente("Registro enviando rol administrador en el body", bodyConRolAdmin);
@@ -241,9 +245,10 @@ public class HU04RegistroClienteApiTest {
         String emailProv = DatosPrueba.generarEmail("cp04e", 2);
         Response resProv = tokenCliente != null
                 ? ApiClient.registrarProveedor("Intentar registrar proveedor con token de usuario cliente", tokenCliente,
-                DatosPrueba.bodyRegistro("Prov", emailProv, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"))
+                DatosPrueba.bodyRegistro("Prov", emailProv, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"))
                 : null;
 
+        EvidenciaRecorder.principal(reg, login, resProv);
         assertAll("Aserciones CP-04-E",
                 () -> assertEquals(201, reg.getStatusCode(), "Registro debe responder 201"),
                 () -> assertEquals("cliente", reg.jsonPath().getString("rol"), "El rol devuelto debe ser 'cliente'"),

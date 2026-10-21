@@ -31,7 +31,7 @@ public class HU03LogoutApiTest {
 
         String email = DatosPrueba.generarEmail("cp03a", 1);
         Response reg = ApiClient.registrarCliente("Registrar cliente para prueba de logout",
-                DatosPrueba.bodyRegistro("Cliente CP03A", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP03A", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, reg.getStatusCode(), "El prerrequisito de registro debe responder 201");
 
         Response login = ApiClient.login("Login para obtener token", email, DatosPrueba.DEFAULT_PASSWORD);
@@ -48,10 +48,11 @@ public class HU03LogoutApiTest {
         // Sonda después del cierre
         Response sondaDespues = ApiClient.sondaSesionCliente("Sonda con sesión cerrada después de logout", token);
 
+        EvidenciaRecorder.principal(logout, sondaAntes, sondaDespues);
         assertAll("Aserciones CP-03-A",
                 () -> assertNotEquals(401, sondaAntes.getStatusCode(), "La sonda antes del cierre no debe responder 401"),
                 () -> assertEquals(200, logout.getStatusCode(), "El logout debe responder 200"),
-                () -> assertEquals("Sesión cerrada exitosamente", logout.getBody().asString().trim(),
+                () -> assertEquals("Sesión cerrada exitosamente", ApiClient.cuerpo(logout).trim(),
                         "El cuerpo de logout debe ser 'Sesión cerrada exitosamente'"),
                 () -> assertEquals(401, sondaDespues.getStatusCode(), "La sonda después de logout debe responder 401")
         );
@@ -75,7 +76,7 @@ public class HU03LogoutApiTest {
         // Variante (c): token de sesión ya cerrada
         String emailC = DatosPrueba.generarEmail("cp03b", 1);
         Response regC = ApiClient.registrarCliente("Registrar cliente para variante (c)",
-                DatosPrueba.bodyRegistro("Cliente CP03B", emailC, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP03B", emailC, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, regC.getStatusCode(), "El registro previo debe responder 201");
 
         Response loginC = ApiClient.login("Login para variante (c)", emailC, DatosPrueba.DEFAULT_PASSWORD);
@@ -88,19 +89,20 @@ public class HU03LogoutApiTest {
         // Segundo logout con token ya revocado
         Response resC = ApiClient.logout("Segundo logout con token de sesión ya cerrada", tokenC);
 
+        EvidenciaRecorder.principal(resA, resB, resC);
         assertAll("Aserciones CP-03-B",
                 () -> assertEquals(401, resA.getStatusCode(), "Variante (a) debe responder 401"),
-                () -> assertEquals("No hay sesión activa", resA.getBody().asString().trim(),
+                () -> assertEquals("No hay sesión activa", ApiClient.cuerpo(resA).trim(),
                         "Variante (a) debe responder 'No hay sesión activa'"),
                 () -> assertTrue(resA.getStatusCode() < 500, "Variante (a) no debe ser 5xx"),
 
                 () -> assertEquals(401, resB.getStatusCode(), "Variante (b) debe responder 401"),
-                () -> assertEquals("No hay sesión activa", resB.getBody().asString().trim(),
+                () -> assertEquals("No hay sesión activa", ApiClient.cuerpo(resB).trim(),
                         "Variante (b) debe responder 'No hay sesión activa'"),
                 () -> assertTrue(resB.getStatusCode() < 500, "Variante (b) no debe ser 5xx"),
 
                 () -> assertEquals(401, resC.getStatusCode(), "Variante (c) debe responder 401"),
-                () -> assertEquals("Sesión expirada. Por favor, inicie sesión nuevamente", resC.getBody().asString().trim(),
+                () -> assertEquals("Sesión expirada. Por favor, inicie sesión nuevamente", ApiClient.cuerpo(resC).trim(),
                         "Variante (c) debe responder 'Sesión expirada. Por favor, inicie sesión nuevamente'"),
                 () -> assertTrue(resC.getStatusCode() < 500, "Variante (c) no debe ser 5xx")
         );
@@ -129,7 +131,7 @@ public class HU03LogoutApiTest {
 
         // 3. Intentar registrar proveedor con token revocado
         String emailProveedor = DatosPrueba.generarEmail("cp03c", 1);
-        String bodyProveedor = DatosPrueba.bodyRegistro("Proveedor CP03C", emailProveedor, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Carrera 5 # 6-7");
+        String bodyProveedor = DatosPrueba.bodyRegistro("Proveedor CP03C", emailProveedor, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Carrera 5 # 6-7");
         Response resProveedor = ApiClient.registrarProveedor("Registrar proveedor con token admin revocado", tokenAdminRevocado, bodyProveedor);
 
         // 4. Verificación de no queda registrado (§5.3)
@@ -144,9 +146,10 @@ public class HU03LogoutApiTest {
         assertNotNull(tokenAdminFresco, "Se requiere token admin fresco para verificar que la cuenta no quedó creada");
         Response verificacionApi = ApiClient.registrarProveedor("Verificación §5.3: registrar mismo correo con token fresco", tokenAdminFresco, bodyProveedor);
 
+        EvidenciaRecorder.principal(resProveedor);
         assertAll("Aserciones CP-03-C",
                 () -> assertEquals(401, resProveedor.getStatusCode(), "Debe responder 401 con token revocado"),
-                () -> assertEquals("Sesión expirada. Por favor, inicie sesión nuevamente", resProveedor.getBody().asString().trim(),
+                () -> assertEquals("Sesión expirada. Por favor, inicie sesión nuevamente", ApiClient.cuerpo(resProveedor).trim(),
                         "Mensaje esperado 'Sesión expirada. Por favor, inicie sesión nuevamente'"),
                 () -> assertEquals(201, verificacionApi.getStatusCode(),
                         "Verificación §5.3: Registrar el correo después debe dar 201 (si da 409 quedó registrado erróneamente)")

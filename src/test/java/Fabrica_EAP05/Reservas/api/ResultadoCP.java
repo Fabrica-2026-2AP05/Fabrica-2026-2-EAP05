@@ -16,6 +16,7 @@ public class ResultadoCP {
     private BugInfo bugSugerido;
     private String httpObtenido = "-";
     private String esperado = "-";
+    private boolean httpPrincipalFijado = false;
 
     public ResultadoCP() {}
 
@@ -156,6 +157,8 @@ public class ResultadoCP {
     public void setBugSugerido(BugInfo bugSugerido) { this.bugSugerido = bugSugerido; }
     public String getHttpObtenido() { return httpObtenido; }
     public void setHttpObtenido(String httpObtenido) { this.httpObtenido = httpObtenido; }
+    public boolean isHttpPrincipalFijado() { return httpPrincipalFijado; }
+    public void fijarHttpPrincipal(String http) { this.httpObtenido = http; this.httpPrincipalFijado = true; }
     public String getEsperado() { return esperado; }
     public void setEsperado(String esperado) { this.esperado = esperado; }
 }

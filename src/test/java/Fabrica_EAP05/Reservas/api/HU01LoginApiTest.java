@@ -31,7 +31,7 @@ public class HU01LoginApiTest {
 
         String email = DatosPrueba.generarEmail("cp01a", 1);
         Response reg = ApiClient.registrarCliente("Registrar cliente para login",
-                DatosPrueba.bodyRegistro("Cliente CP01A", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP01A", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, reg.getStatusCode(), "El prerrequisito de registro de cliente debe responder 201");
 
         Response login = ApiClient.login("POST /api/auth/login credenciales correctas", email, DatosPrueba.DEFAULT_PASSWORD);
@@ -43,6 +43,7 @@ public class HU01LoginApiTest {
 
         Response sonda = token != null ? ApiClient.sondaSesionCliente("Sonda con sesión cliente", token) : null;
 
+        EvidenciaRecorder.principal(login, sonda);
         assertAll("Aserciones CP-01-A",
                 () -> assertEquals(200, login.getStatusCode(), "Código HTTP esperado 200"),
                 () -> assertNotNull(token, "El token no debe ser nulo"),
@@ -67,11 +68,12 @@ public class HU01LoginApiTest {
 
         String email = DatosPrueba.generarEmail("cp01b", 1);
         Response reg = ApiClient.registrarCliente("Registrar cliente para clave errada",
-                DatosPrueba.bodyRegistro("Cliente CP01B", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP01B", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, reg.getStatusCode(), "El prerrequisito de registro debe responder 201");
 
         Response login = ApiClient.login("Login con contraseña incorrecta", email, "Incorrecta99");
 
+        EvidenciaRecorder.principal(login);
         assertAll("Aserciones CP-01-B",
                 () -> assertEquals(401, login.getStatusCode(), "Código HTTP esperado 401"),
                 () -> assertNotNull(login.jsonPath().get("timestamp"), "Debe contener timestamp"),
@@ -91,7 +93,7 @@ public class HU01LoginApiTest {
 
         String email = DatosPrueba.generarEmail("cp01c", 1);
         Response reg = ApiClient.registrarCliente("Registrar cuenta nueva dedicada",
-                DatosPrueba.bodyRegistro("Cliente CP01C", email, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP01C", email, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, reg.getStatusCode(), "El prerrequisito de registro debe responder 201");
 
         // 5 intentos fallidos
@@ -104,6 +106,7 @@ public class HU01LoginApiTest {
 
         String mensaje = sexto.jsonPath().getString("mensaje");
 
+        EvidenciaRecorder.principal(sexto);
         assertAll("Aserciones CP-01-C",
                 () -> assertEquals(429, sexto.getStatusCode(), "El 6to intento debe responder 429 Too Many Requests"),
                 () -> assertNotNull(mensaje, "Debe contener mensaje de bloqueo"),
@@ -129,6 +132,7 @@ public class HU01LoginApiTest {
         // Variante (b): sin email
         Response resB = ApiClient.login("Login sin email", null, DatosPrueba.DEFAULT_PASSWORD);
 
+        EvidenciaRecorder.principal(resA, resB);
         assertAll("Aserciones CP-01-D",
                 () -> assertEquals(400, resA.getStatusCode(), "Variante (a) debe responder 400"),
                 () -> assertEquals("La contraseña es obligatoria", resA.jsonPath().getString("errores.contrasena"),
@@ -154,7 +158,7 @@ public class HU01LoginApiTest {
         // 1. Ejecutar petición de CP-01-B (cuenta existente + clave errada) para comparar
         String emailExistente = DatosPrueba.generarEmail("cp01e", 1);
         Response reg = ApiClient.registrarCliente("Registrar cliente para referencia de clave errada",
-                DatosPrueba.bodyRegistro("Cliente CP01E", emailExistente, DatosPrueba.DEFAULT_PASSWORD, "3001234567", "Calle 1 # 2-3"));
+                DatosPrueba.bodyRegistro("Cliente CP01E", emailExistente, DatosPrueba.DEFAULT_PASSWORD, "3009876543", "Calle 1 # 2-3"));
         assertEquals(201, reg.getStatusCode(), "El prerrequisito de registro debe responder 201");
 
         Response resClaveErrada = ApiClient.login("Referencia clave errada cuenta existente", emailExistente, "ClaveErrada99");
@@ -165,6 +169,7 @@ public class HU01LoginApiTest {
         String emailNoExiste = "noexiste." + ApiTestConfig.getRunId() + "@example.com";
         Response resNoExiste = ApiClient.login("Login con correo no registrado", emailNoExiste, "MiPassword123");
 
+        EvidenciaRecorder.principal(resNoExiste);
         assertAll("Aserciones CP-01-E",
                 () -> assertEquals(401, resNoExiste.getStatusCode(), "Código HTTP esperado 401"),
                 () -> assertEquals("Credenciales inválidas", resNoExiste.jsonPath().getString("mensaje"),
@@ -193,7 +198,7 @@ public class HU01LoginApiTest {
             emailInactivo = DatosPrueba.generarEmail("cp01f", 1);
             passInactivo = DatosPrueba.DEFAULT_PASSWORD;
             Response reg = ApiClient.registrarCliente("Registrar cliente para marcarlo inactivo en BD",
-                    DatosPrueba.bodyRegistro("Cliente CP01F", emailInactivo, passInactivo, "3001234567", "Calle 1 # 2-3"));
+                    DatosPrueba.bodyRegistro("Cliente CP01F", emailInactivo, passInactivo, "3009876543", "Calle 1 # 2-3"));
             assertEquals(201, reg.getStatusCode(), "El registro de cliente debe responder 201");
 
             boolean marcado = DbVerifier.marcarInactivo(emailInactivo);
@@ -207,6 +212,7 @@ public class HU01LoginApiTest {
 
         Response login = ApiClient.login("Login con usuario inactivo y clave correcta", emailInactivo, passInactivo);
 
+        EvidenciaRecorder.principal(login);
         assertAll("Aserciones CP-01-F",
                 () -> assertEquals(401, login.getStatusCode(), "Código HTTP esperado 401"),
                 () -> assertEquals("El usuario se encuentra inactivo", login.jsonPath().getString("mensaje"),
