@@ -1,0 +1,28 @@
+# Configuracion de pruebas de API para HU01, HU03, HU04 y HU05
+# Copiar este archivo a api-tests.properties o configurar las variables de entorno equivalentes.
+
+# URL base de la API (Render o local)
+QA_BASE_URL=https://fabrica-2026-2-eap05-1.onrender.com
+
+# Credenciales de administrador (obligatorias para HU05 y CP-03-C)
+# NUNCA subir valores reales a control de versiones ni a la documentacion
+QA_ADMIN_EMAIL=
+QA_ADMIN_PASSWORD=
+
+# Nombre del ejecutor de las pruebas
+QA_EJECUTOR=Garzon Mejia Juan Jose
+
+# Rama o commit desplegado en el ambiente bajo prueba (ej. calidad@9d944da, Sprint-1@d92fe72 o desconocida)
+QA_RAMA_DESPLEGADA=desconocida
+
+# Timeout en milisegundos para peticiones HTTP y calentamiento (Render free tier puede tardar en despertar)
+QA_TIMEOUT_MS=90000
+
+# Configuracion opcional de base de datos Supabase (para verificaciones directas en BD)
+# QA_DB_URL=jdbc:postgresql://...
+# QA_DB_USER=...
+# QA_DB_PASSWORD=...
+
+# Usuario inactivo preexistente (alternativa opcional a BD para CP-01-F)
+# QA_INACTIVE_EMAIL=
+# QA_INACTIVE_PASSWORD=
