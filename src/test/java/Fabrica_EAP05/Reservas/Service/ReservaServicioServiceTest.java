@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -217,6 +218,38 @@ class ReservaServicioServiceTest {
         assertAll(() -> assertEquals(reservaId, resultado.getId()),
                 () -> assertEquals("cancelada", resultado.getEstado()),
                 () -> assertNotNull(resultado.getCanceladaEn()));
+        verify(entityManager).refresh(reserva);
+    }
+
+    @Test
+    @DisplayName("Permite cancelar cuando faltan exactamente 12 horas para el inicio")
+    void cancelarReserva_exactamenteDoceHorasAntes_permiteLaCancelacion() {
+        LocalDateTime ahoraPrueba = LocalDateTime.of(2026, 10, 31, 20, 0);
+        horario.setInicio(ahoraPrueba.plusHours(12));
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(reservaRepository.findByIdParaActualizar(reservaId)).thenReturn(Optional.of(reserva));
+
+        // Simula el contrato del trigger de BD: el límite se rechaza solo si faltan menos de 12 horas.
+        when(reservaRepository.saveAndFlush(any(ReservaServicio.class))).thenAnswer(invocation -> {
+            ReservaServicio actualizada = invocation.getArgument(0);
+            Duration tiempoRestante = Duration.between(ahoraPrueba, horario.getInicio());
+            if (tiempoRestante.compareTo(Duration.ofHours(12)) < 0) {
+                throw new IllegalStateException("faltan menos de 12 horas");
+            }
+            actualizada.setCanceladaEn(ahoraPrueba);
+            return actualizada;
+        });
+
+        CancelarReservaResponse resultado = reservaService.cancelarReserva(email, reservaId);
+
+        assertAll(
+                () -> assertEquals(Duration.ofHours(12),
+                        Duration.between(ahoraPrueba, horario.getInicio())),
+                () -> assertEquals(reservaId, resultado.getId()),
+                () -> assertEquals("cancelada", resultado.getEstado()),
+                () -> assertNotNull(resultado.getCanceladaEn())
+        );
+        verify(reservaRepository).saveAndFlush(reserva);
         verify(entityManager).refresh(reserva);
     }
 
