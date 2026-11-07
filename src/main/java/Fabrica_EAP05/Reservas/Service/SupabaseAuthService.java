@@ -132,16 +132,19 @@ public class SupabaseAuthService {
 
         Map<String, Object> responseBody = response.getBody();
         if (responseBody == null) {
-            throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException(
+                "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
         }
 
         Object accessToken = responseBody.get("access_token");
         if (accessToken == null) {
-            throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException(
+                "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
         }
         return accessToken.toString();
     } catch (HttpClientErrorException e) {
-        throw new CredencialesInvalidasException("Token de recuperación inválido o expirado");
+        throw new CredencialesInvalidasException(
+            "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
     }
     }
 
