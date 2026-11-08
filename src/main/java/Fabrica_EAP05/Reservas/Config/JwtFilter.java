@@ -50,6 +50,8 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = authHeader.replace("Bearer ", "");
 
             if (tokenBlacklistService.estaEnLista(token)) {
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("text/plain;charset=UTF-8");
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Sesión expirada. Por favor, inicie sesión nuevamente");
                 return;
@@ -72,6 +74,8 @@ public class JwtFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     } else {
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setCharacterEncoding("UTF-8");
+                        response.setContentType("text/plain;charset=UTF-8");
                         response.getWriter().write("Sesión expirada por inactividad");
                         return;
                     }
