@@ -108,7 +108,8 @@ public class SecurityConfig {
                 // Sin token válido / no autenticado -> 401 con mensaje claro
                 .authenticationEntryPoint((request, response, authException) -> {
                 response.setStatus(401);
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("application/json;charset=UTF-8");
                 Map<String, Object> body = new HashMap<>();
                 body.put("timestamp", OffsetDateTime.now().toString());
                 body.put("mensaje", "No autenticado: debes iniciar sesion para acceder a este recurso");
