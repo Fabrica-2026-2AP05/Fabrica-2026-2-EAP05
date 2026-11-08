@@ -105,7 +105,7 @@ public class AuthService {
                     String.class
             );
         } catch (HttpClientErrorException e) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+            throw new CredencialesInvalidasException("Credenciales inválidas");
         }
     }
 
