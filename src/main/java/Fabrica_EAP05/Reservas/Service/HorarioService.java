@@ -1,5 +1,6 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import org.springframework.security.access.AccessDeniedException;
 import java.util.List;
 import java.util.UUID;
 
@@ -51,7 +52,7 @@ public class HorarioService {
         // 3. Criterio de Aceptación: Validar que el proveedor esté asociado a al menos un servicio
         boolean asociado = proveedorServicioRepository.existsByProveedorId(request.getProveedorId());
         if (!asociado) {
-            throw new IllegalArgumentException("El proveedor debe estar asociado a al menos un servicio para registrar un horario.");
+            throw new AccessDeniedException("El proveedor debe estar asociado a al menos un servicio para registrar un horario.");
         }
 
         // 4. Criterio de Aceptación: Validar solapamientos
