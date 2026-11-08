@@ -13,6 +13,7 @@ import Fabrica_EAP05.Reservas.Entities.Recurso;
 import jakarta.persistence.LockModeType;
 
 public interface RecursoRepository extends JpaRepository<Recurso, UUID> {
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM Recurso r WHERE LOWER(r.nombre) = LOWER(:nombre)")
     boolean existsByNombre(String nombre);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Recurso r WHERE r.id = :id")

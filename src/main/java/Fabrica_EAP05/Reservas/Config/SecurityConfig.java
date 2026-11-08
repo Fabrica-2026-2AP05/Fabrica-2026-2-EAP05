@@ -65,8 +65,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. Desactivar CSRF (necesario para APIs REST sin sesión)
-            .csrf(csrf -> csrf.disable())
+            // 1. Desactivar CSRF intencionalmente para API REST Stateless
+            .csrf(csrf -> csrf
+                    .ignoringRequestMatchers("/api/**", "/swagger-ui/**", "/v3/api-docs/**")
+            )
 
             // 2. Habilitar CORS con la configuración de arriba
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -83,13 +85,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
-                    // Dentro de SecurityConfig / HttpSecurity:
-                    .requestMatchers(HttpMethod.POST, "/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    // RESTRICCIÓN ESPECÍFICA DE ROL:
-                    .requestMatchers(HttpMethod.POST, "/api/proveedor-servicio/asignar").hasAnyRole("administrador", "ADMIN")
-                    .requestMatchers(HttpMethod.GET, "/api/agenda/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    .requestMatchers("/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
-                    .requestMatchers("/error").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers(HttpMethod.POST, "/api/proveedor-servicio/asignar").hasAnyRole("administrador", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/agenda/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/api/horarios/**").hasAnyRole("proveedor", "PROVEEDOR")
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
@@ -108,7 +108,8 @@ public class SecurityConfig {
                 // Sin token válido / no autenticado -> 401 con mensaje claro
                 .authenticationEntryPoint((request, response, authException) -> {
                 response.setStatus(401);
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("application/json;charset=UTF-8");
                 Map<String, Object> body = new HashMap<>();
                 body.put("timestamp", OffsetDateTime.now().toString());
                 body.put("mensaje", "No autenticado: debes iniciar sesion para acceder a este recurso");
