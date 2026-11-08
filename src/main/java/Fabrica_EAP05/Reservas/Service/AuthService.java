@@ -57,10 +57,18 @@ public class AuthService {
 
     public LoginResponseDTO login(LoginDTO dto) {
 
-        // 0. Verificar si el usuario está bloqueado ANTES de gastar una llamada a Supabase
+        // 0. Verificar si el usuario está bloqueado
         loginAttemptService.verificarBloqueo(dto.getEmail());
 
-        // 1. Validar credenciales contra Supabase Auth
+        // 1. Buscar perfil local primero y validar si está activo
+        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
+                .orElseThrow(() -> new CredencialesInvalidasException("Credenciales inválidas"));
+
+        if (Boolean.FALSE.equals(usuario.getActivo())) {
+            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
+        }
+
+        // 2. Validar credenciales contra Supabase Auth
         try {
             validarCredencialesSupabase(dto.getEmail(), dto.getContrasena());
         } catch (CredencialesInvalidasException e) {
@@ -71,20 +79,13 @@ public class AuthService {
         // Login exitoso: resetear contador
         loginAttemptService.registrarExito(dto.getEmail());
 
-        // 2. Buscar perfil local por email
-        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-        .orElseThrow(() -> new CredencialesInvalidasException("Usuario no encontrado"));        
-        // 3. Verificar estado del usuario en tu base de datos
-        if (Boolean.FALSE.equals(usuario.getActivo())) {
-            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
-        }
-
-        // 4. Generar token y registrar actividad
+        // 3. Generar token y registrar actividad
         String token = jwtUtil.generarToken(usuario.getEmail(), usuario.getRol());
         inactivityTrackingService.registrarActividad(usuario.getEmail());
 
         return new LoginResponseDTO(token, usuario.getEmail(), usuario.getRol());
     }
+
 
     private void validarCredencialesSupabase(String email, String password) {
         HttpHeaders headers = new HttpHeaders();
