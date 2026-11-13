@@ -1,26 +1,38 @@
 package Fabrica_EAP05.Reservas.Service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class MailService {
 
     @Autowired
-    private JavaMailSender mailSender;
+    private RestTemplate restTemplate;
 
-    public void enviarEmailResetPassword(String destinatario, String nombreUsuario, String token) throws MessagingException {
-        MimeMessage mensaje = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(mensaje, "UTF-8");
+    @Value("${brevo.api-key}")
+    private String brevoApiKey;
 
-        helper.setTo(destinatario);
-        helper.setFrom("reservas.fabrica.eap05@gmail.com");
-        helper.setSubject("Recuperación de contraseña - Fabrica EAP05");
+    @Value("${brevo.sender-email}")
+    private String senderEmail;
+
+    @Value("${brevo.sender-name:Reservas EAP05}")
+    private String senderName;
+
+    private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+
+    public void enviarEmailResetPassword(String destinatario, String nombreUsuario, String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", brevoApiKey);
+        headers.set("accept", "application/json");
 
         String html = """
                 <html>
@@ -36,7 +48,17 @@ public class MailService {
                 </html>
                 """.formatted(nombreUsuario, token);
 
-        helper.setText(html, true);
-        mailSender.send(mensaje);
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("email", senderEmail, "name", senderName),
+                "to", List.of(Map.of("email", destinatario)),
+                "subject", "Recuperación de contraseña - Fabrica EAP05",
+                "htmlContent", html
+        );
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        // Deja propagar cualquier error HTTP: AuthService.solicitarRecuperacion
+        // ya lo captura como best-effort y solo lo registra en logs.
+        restTemplate.postForEntity(BREVO_URL, request, String.class);
     }
 }
