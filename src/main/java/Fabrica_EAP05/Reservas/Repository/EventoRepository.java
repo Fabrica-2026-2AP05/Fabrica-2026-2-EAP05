@@ -8,4 +8,5 @@ import Fabrica_EAP05.Reservas.Entities.Evento;
 
 public interface EventoRepository extends JpaRepository<Evento, UUID> {
     boolean existsByNombre(String nombre);
+    boolean existsByNombreAndIdNot(String nombre, UUID id);
 }

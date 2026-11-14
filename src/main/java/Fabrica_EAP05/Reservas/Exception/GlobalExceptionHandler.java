@@ -115,6 +115,13 @@ public class GlobalExceptionHandler {
         body.put("mensaje", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
+    @ExceptionHandler(EventoNoEncontradoException.class)
+    public ResponseEntity<Map<String, Object>> handleEventoNoEncontrado(EventoNoEncontradoException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("mensaje", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
