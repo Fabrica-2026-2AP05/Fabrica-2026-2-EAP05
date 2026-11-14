@@ -130,4 +130,12 @@ public class GlobalExceptionHandler {
         body.put("mensaje", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
+
+    @ExceptionHandler(CapacidadInsuficienteException.class)
+    public ResponseEntity<Map<String, Object>> handleCapacidadInsuficiente(CapacidadInsuficienteException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("mensaje", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+}
 }
