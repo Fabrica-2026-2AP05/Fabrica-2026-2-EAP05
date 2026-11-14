@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import Fabrica_EAP05.Reservas.DTO.CuposDisponiblesResponse;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
@@ -114,6 +115,20 @@ public class EventoService {
         );
     }
     
+    public CuposDisponiblesResponse consultarCupos(UUID id) {
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new EventoNoEncontradoException("El evento no existe"));
+
+        long confirmadas = reservaEventoRepository.countByEventoIdAndEstado(id, EstadoReserva.confirmada);
+        int disponibles = Math.max(0, evento.getCapacidad() - (int) confirmadas);
+
+        return new CuposDisponiblesResponse(
+                evento.getId(),
+                evento.getCapacidad(),
+                disponibles,
+                disponibles > 0
+        );
+    }
 
     // Las entidades mapean timestamptz como LocalDateTime en la zona de la JVM
     private LocalDateTime aLocal(OffsetDateTime fecha) {
