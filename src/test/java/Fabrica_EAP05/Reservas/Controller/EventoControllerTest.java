@@ -1,6 +1,7 @@
 package Fabrica_EAP05.Reservas.Controller;
 
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
+import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
 import Fabrica_EAP05.Reservas.Exception.CupoAgotadoException;
 import Fabrica_EAP05.Reservas.Exception.EventoNoEncontradoException;
@@ -16,6 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,7 +37,8 @@ class EventoControllerTest {
     @BeforeEach void setUp() {
         email = "cliente@correo.com";
         eventoId = UUID.randomUUID();
-        when(authentication.getName()).thenReturn(email);
+        // lenient: los tests de ocupación (HU28) no usan Authentication
+        lenient().when(authentication.getName()).thenReturn(email);
     }
 
     @Test void reservarCupo_conCupos_retornaCreated() {
@@ -88,5 +93,42 @@ class EventoControllerTest {
         // Act + Assert
         assertThrows(PlazoCancelacionException.class,
                 () -> controller.cancelarReservaEvento(eventoId, reservaId, authentication));
+    }
+
+    // ---------- HU28: ocupación de eventos ----------
+
+    private final LocalDateTime desde = LocalDateTime.of(2026, 12, 1, 0, 0);
+    private final LocalDateTime hasta = LocalDateTime.of(2027, 1, 1, 0, 0);
+
+    @Test void reporteOcupacion_conDatos_retornaLista() {
+        // Arrange
+        List<OcupacionEventoResponse> reporte = List.of(
+                new OcupacionEventoResponse(eventoId, "Taller", 3, 1L, 33.3));
+        when(eventoService.reporteOcupacion(desde, hasta)).thenReturn(reporte);
+        // Act
+        ResponseEntity<?> respuesta = controller.reporteOcupacion(desde, hasta);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.OK, respuesta.getStatusCode()),
+                () -> assertEquals(reporte, respuesta.getBody()));
+    }
+
+    @Test void reporteOcupacion_sinDatos_retornaMensaje() {
+        // Arrange
+        when(eventoService.reporteOcupacion(desde, hasta)).thenReturn(List.of());
+        // Act
+        ResponseEntity<?> respuesta = controller.reporteOcupacion(desde, hasta);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.OK, respuesta.getStatusCode()),
+                () -> assertEquals(Map.of("mensaje", "No existen datos de ocupación para el periodo consultado."),
+                        respuesta.getBody()));
+    }
+
+    // El 400 lo arma GlobalExceptionHandler (IllegalArgumentException); el controller solo propaga
+    @Test void reporteOcupacion_desdeNoAnteriorAHasta_propagaExcepcion() {
+        // Arrange
+        when(eventoService.reporteOcupacion(hasta, desde))
+                .thenThrow(new IllegalArgumentException("La fecha 'desde' debe ser anterior a la fecha 'hasta'"));
+        // Act + Assert
+        assertThrows(IllegalArgumentException.class, () -> controller.reporteOcupacion(hasta, desde));
     }
 }

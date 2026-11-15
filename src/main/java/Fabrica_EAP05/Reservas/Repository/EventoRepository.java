@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +22,8 @@ public interface EventoRepository extends JpaRepository<Evento, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Evento e WHERE e.id = :id")
     Optional<Evento> findByIdParaActualizar(@Param("id") UUID id);
+
+    // HU28: eventos cuyo inicio está en [desde, hasta), ordenados por inicio
+    @Query("SELECT e FROM Evento e WHERE e.inicio >= :desde AND e.inicio < :hasta ORDER BY e.inicio")
+    List<Evento> findByPeriodo(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 }
