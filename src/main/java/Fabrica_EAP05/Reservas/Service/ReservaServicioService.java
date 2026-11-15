@@ -29,6 +29,13 @@ import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
+import java.util.ArrayList;
+import java.util.Comparator;
+import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
+import Fabrica_EAP05.Reservas.Entities.Evento;
+import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
+import Fabrica_EAP05.Reservas.Repository.EventoRepository;
+import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 
 @Service
 public class ReservaServicioService {
@@ -50,6 +57,12 @@ public class ReservaServicioService {
 
     @Autowired
     private Fabrica_EAP05.Reservas.Repository.RecursoRepository recursoRepository;
+
+    @Autowired
+    private ReservaEventoRepository reservaEventoRepository;
+
+    @Autowired
+    private EventoRepository eventoRepository;
 
     @Transactional(readOnly = true)
     public java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> consultarHistorialCliente(String email) {
@@ -257,5 +270,91 @@ public class ReservaServicioService {
                     aOffset(reserva.getCreadaEn())
             );
         }).toList();
+
+
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistorialNegocioResponse> consultarHistorialNegocio(String email) {
+        Usuario admin = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(admin.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<HistorialNegocioResponse> historial = new ArrayList<>();
+
+        // 1. Traer todas las reservas de servicios
+        for (ReservaServicio r : reservaServicioRepository.findAll()) {
+            String nombreServicio = servicioRepository.findById(r.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            String nombreCliente = usuarioRepository.findById(r.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            Horario horario = horarioRepository.findById(r.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (r.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(r.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            historial.add(new HistorialNegocioResponse(
+                    r.getId(),
+                    "SERVICIO",
+                    r.getServicioId(),
+                    nombreServicio,
+                    r.getClienteId(),
+                    nombreCliente,
+                    inicio,
+                    fin,
+                    r.getRecursoId(),
+                    nombreRecurso,
+                    r.getEstado().name(),
+                    aOffset(r.getCreadaEn())
+            ));
+        }
+
+        // 2. Traer todas las reservas de eventos
+        for (ReservaEvento re : reservaEventoRepository.findAll()) {
+            Evento evento = eventoRepository.findById(re.getEventoId()).orElse(null);
+            String nombreEvento = evento != null ? evento.getNombre() : "Evento no disponible";
+            OffsetDateTime inicio = evento != null ? aOffset(evento.getInicio()) : null;
+            OffsetDateTime fin = evento != null ? aOffset(evento.getFin()) : null;
+
+            String nombreCliente = usuarioRepository.findById(re.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            historial.add(new HistorialNegocioResponse(
+                    re.getId(),
+                    "EVENTO",
+                    re.getEventoId(),
+                    nombreEvento,
+                    re.getClienteId(),
+                    nombreCliente,
+                    inicio,
+                    fin,
+                    null,
+                    null,
+                    re.getEstado().name(),
+                    null
+            ));
+        }
+
+        // 3. Ordenar todo por fecha de inicio (más recientes primero)
+        historial.sort(Comparator.comparing(
+                HistorialNegocioResponse::getInicio,
+                Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+
+        return historial;
     }
 }
