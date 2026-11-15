@@ -1,5 +1,6 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -15,11 +17,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import Fabrica_EAP05.Reservas.DTO.HorarioDisponibleResponse;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioResponse;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
+import Fabrica_EAP05.Reservas.Service.ReservaServicioService;
 import Fabrica_EAP05.Reservas.Service.ServicioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,11 +35,15 @@ import lombok.Setter;
 
 @RestController
 @RequestMapping("/api/servicios")
-@Tag(name = "Servicios", description = "Registro y modificación de servicios. Solo administradores.")
+@Tag(name = "Servicios", description = "Registro y modificación de servicios (administradores) "
+        + "y consulta de disponibilidad (clientes).")
 public class ServicioController {
 
     @Autowired
     private ServicioService servicioService;
+
+    @Autowired
+    private ReservaServicioService reservaServicioService;
 
     @Getter
     @Setter
@@ -122,6 +130,34 @@ public class ServicioController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error interno: " + e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar disponibilidad de un servicio",
+            description = "Lista los horarios futuros en estado disponible de los proveedores asignados "
+                    + "al servicio. Si el servicio requiere recurso, solo se incluyen los horarios en que "
+                    + "el recurso está activo, tiene disponibilidad que cubre el rango y no tiene reservas "
+                    + "confirmadas. Si no hay horarios se retorna una lista vacía.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de horarios disponibles (puede estar vacía)"),
+            @ApiResponse(responseCode = "400", description = "El servicioId no tiene formato UUID válido"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente)"),
+            @ApiResponse(responseCode = "404", description = "El servicio no existe"),
+            @ApiResponse(responseCode = "409", description = "El servicio no está activo")
+    })
+    @GetMapping("/{servicioId}/disponibilidad")
+    @PreAuthorize("hasRole('cliente')")
+    public ResponseEntity<?> consultarDisponibilidad(@PathVariable UUID servicioId) {
+        try {
+            List<HorarioDisponibleResponse> horarios = reservaServicioService.consultarDisponibilidad(servicioId);
+            return ResponseEntity.ok(horarios);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 }
