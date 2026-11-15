@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import Fabrica_EAP05.Reservas.Entities.Horario;
 import jakarta.persistence.LockModeType;
+import Fabrica_EAP05.Reservas.Enums.EstadoHorario;
 
 public interface HorarioRepository extends JpaRepository<Horario, UUID> {
 
@@ -31,4 +32,21 @@ public interface HorarioRepository extends JpaRepository<Horario, UUID> {
 
     // NUEVO MÉTODO PARA HU10 (Bloquear Horario)
     Optional<Horario> findByIdAndProveedorId(UUID id, UUID proveedorId);
+
+    // HU26: total de horarios ofertados (excluyendo bloqueados) para los proveedores de un servicio en [desde, hasta)
+    @Query("""
+            SELECT COUNT(h) FROM Horario h
+            WHERE h.proveedorId IN (
+                SELECT ps.proveedor.id FROM ProveedorServicio ps WHERE ps.servicio.id = :servicioId
+            )
+            AND h.estado <> :estadoBloqueado
+            AND h.inicio >= :desde
+            AND h.inicio < :hasta
+            """)
+    long contarHorariosOfertadosPorServicioEnPeriodo(
+            @Param("servicioId") UUID servicioId,
+            @Param("estadoBloqueado") EstadoHorario estadoBloqueado,
+            @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta
+    );
 }

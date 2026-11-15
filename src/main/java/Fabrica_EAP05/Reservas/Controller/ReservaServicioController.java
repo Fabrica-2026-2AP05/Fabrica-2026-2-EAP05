@@ -23,6 +23,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import org.springframework.format.annotation.DateTimeFormat;
+import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 
 @RestController
 @RequestMapping("/api/reservas")
@@ -157,6 +160,38 @@ public class ReservaServicioController {
             }
 
             return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar ocupación de servicios",
+            description = "Calcula el porcentaje de horarios reservados respecto al total de horarios ofertados por cada servicio en un periodo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reporte de ocupación generado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Parámetros de fecha inválidos"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/ocupacion-servicios")
+    @PreAuthorize("hasAnyRole('administrador', 'ADMIN')")
+    public ResponseEntity<?> consultarOcupacionServicios(
+            @AuthenticationPrincipal String email,
+            @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam("hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
+        try {
+            List<OcupacionServicioResponse> ocupacion =
+                    reservaServicioService.consultarOcupacionServicios(email, desde, hasta);
+
+            if (ocupacion.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen datos de ocupación para el periodo consultado",
+                        "servicios", ocupacion
+                ));
+            }
+
+            return ResponseEntity.ok(ocupacion);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("mensaje", e.getMessage()));

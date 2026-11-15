@@ -77,5 +77,20 @@ public interface ReservaServicioRepository extends JpaRepository<ReservaServicio
             + "WHERE r.creadaEn >= :desde AND r.creadaEn < :hasta "
             + "GROUP BY r.servicioId")
     List<ConteoReservasServicio> contarReservasPorServicioEnPeriodo(@Param("desde") LocalDateTime desde,
+
                                                                    @Param("hasta") LocalDateTime hasta);
+
+    // HU26: reservas confirmadas de un servicio cuyo horario cae en [desde, hasta)
+    @Query("SELECT COUNT(r) FROM ReservaServicio r, Horario h " +
+            "WHERE r.horarioId = h.id " +
+            "AND r.servicioId = :servicioId " +
+            "AND r.estado = :estado " +
+            "AND h.inicio >= :desde " +
+            "AND h.inicio < :hasta")
+    long contarReservasConfirmadasPorServicioEnPeriodo(@Param("servicioId") UUID servicioId,
+                                                       @Param("estado") EstadoReserva estado,
+                                                       @Param("desde") LocalDateTime desde,
+                                                       @Param("hasta") LocalDateTime hasta); 
 }
+
+
