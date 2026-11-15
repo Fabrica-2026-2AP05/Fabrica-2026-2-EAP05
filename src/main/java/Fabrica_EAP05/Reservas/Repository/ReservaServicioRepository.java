@@ -21,6 +21,8 @@ public interface ReservaServicioRepository extends JpaRepository<ReservaServicio
 
     List<ReservaServicio> findByServicioId(UUID servicioId);
 
+    List<ReservaServicio> findByClienteIdOrderByCreadaEnDesc(UUID clienteId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM ReservaServicio r WHERE r.id = :id")
     Optional<ReservaServicio> findByIdParaActualizar(@Param("id") UUID id);

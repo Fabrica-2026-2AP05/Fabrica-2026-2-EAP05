@@ -47,6 +47,51 @@ public class ReservaServicioService {
     private DisponibilidadRecursoRepository disponibilidadRecursoRepository;
 
     @Autowired
+    private Fabrica_EAP05.Reservas.Repository.RecursoRepository recursoRepository;
+
+    @Transactional(readOnly = true)
+    public java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> consultarHistorialCliente(String email) {
+        Usuario cliente = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(cliente.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        java.util.List<ReservaServicio> reservas = reservaServicioRepository.findByClienteIdOrderByCreadaEnDesc(cliente.getId());
+
+        return reservas.stream().map(reserva -> {
+            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (reserva.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            return new Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse(
+                    reserva.getId(),
+                    reserva.getServicioId(),
+                    nombreServicio,
+                    reserva.getHorarioId(),
+                    inicio,
+                    fin,
+                    reserva.getRecursoId(),
+                    nombreRecurso,
+                    reserva.getEstado().name(),
+                    aOffset(reserva.getCreadaEn())
+            );
+        }).toList();
+    }
+
+    @Autowired
     private EntityManager entityManager;
 
     @Transactional
