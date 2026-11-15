@@ -1,6 +1,7 @@
 package Fabrica_EAP05.Reservas.Controller;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +70,9 @@ public class ReservaServicioController {
                                             @AuthenticationPrincipal String email) {
         try {
             return ResponseEntity.ok(reservaServicioService.cancelarReserva(email, id));
+        } catch (NoSuchElementException e) {
+            // Reserva inexistente o de otro cliente: mismo 404 para no revelar cuál de las dos
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalArgumentException e) {
