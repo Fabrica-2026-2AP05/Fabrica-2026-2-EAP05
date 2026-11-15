@@ -1,8 +1,9 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,31 +21,24 @@ import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private InactivityTrackingService inactivityTrackingService;
+    private final InactivityTrackingService inactivityTrackingService;
 
-    @Autowired
-    private TokenBlacklistService tokenBlacklistService;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
-    @Autowired
-    private SupabaseAuthService supabaseAuthService;
+    private final SupabaseAuthService supabaseAuthService;
 
-     @Autowired
-    private MailService mailService;
+     private final MailService mailService;
 
-    @Autowired
-    private LoginAttemptService loginAttemptService;
+    private final LoginAttemptService loginAttemptService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;

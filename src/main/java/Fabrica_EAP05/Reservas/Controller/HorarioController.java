@@ -1,6 +1,7 @@
 package Fabrica_EAP05.Reservas.Controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,13 +21,12 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/horarios")
+@RequiredArgsConstructor
 public class HorarioController {
 
-    @Autowired
-    private HorarioService horarioService;
+    private final HorarioService horarioService;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('proveedor', 'PROVEEDOR')")

@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -8,7 +10,6 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,19 +28,16 @@ import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import jakarta.persistence.EntityManager;
 
 @Service
+@RequiredArgsConstructor
 public class ServicioService {
 
-    @Autowired
-    private ServicioRepository servicioRepository;
+    private final ServicioRepository servicioRepository;
 
-    @Autowired
-    private RecursoRepository recursoRepository;
+    private final RecursoRepository recursoRepository;
 
-    @Autowired
-    private ReservaServicioRepository reservaServicioRepository;
+    private final ReservaServicioRepository reservaServicioRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
     // HU27: reservas por servicio creadas en [desde, hasta). Incluye los servicios en 0,
     // ordenados de más a menos usado. Si no hay ninguna reserva en el periodo, lista vacía.

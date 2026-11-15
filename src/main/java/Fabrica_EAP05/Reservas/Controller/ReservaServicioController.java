@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -7,7 +9,6 @@ import java.util.UUID;
 
 import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
 import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,10 +31,10 @@ import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 @RestController
 @RequestMapping("/api/reservas")
 @Tag(name = "Reservas", description = "Reservas de servicios")
+@RequiredArgsConstructor
 public class ReservaServicioController {
 
-    @Autowired
-    private ReservaServicioService reservaServicioService;
+    private final ReservaServicioService reservaServicioService;
 
     @Operation(summary = "Crear reserva",
             description = "Reserva un servicio en un horario disponible para el cliente autenticado. "

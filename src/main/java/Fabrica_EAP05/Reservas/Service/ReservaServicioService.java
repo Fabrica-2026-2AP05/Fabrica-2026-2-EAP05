@@ -1,12 +1,13 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,31 +40,24 @@ import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 
 @Service
+@RequiredArgsConstructor
 public class ReservaServicioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private ServicioRepository servicioRepository;
+    private final ServicioRepository servicioRepository;
 
-    @Autowired
-    private HorarioRepository horarioRepository;
+    private final HorarioRepository horarioRepository;
 
-    @Autowired
-    private ReservaServicioRepository reservaServicioRepository;
+    private final ReservaServicioRepository reservaServicioRepository;
 
-    @Autowired
-    private DisponibilidadRecursoRepository disponibilidadRecursoRepository;
+    private final DisponibilidadRecursoRepository disponibilidadRecursoRepository;
 
-    @Autowired
-    private Fabrica_EAP05.Reservas.Repository.RecursoRepository recursoRepository;
+    private final Fabrica_EAP05.Reservas.Repository.RecursoRepository recursoRepository;
 
-    @Autowired
-    private ReservaEventoRepository reservaEventoRepository;
+    private final ReservaEventoRepository reservaEventoRepository;
 
-    @Autowired
-    private EventoRepository eventoRepository;
+    private final EventoRepository eventoRepository;
 
     @Transactional(readOnly = true)
     public java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> consultarHistorialCliente(String email) {
@@ -107,8 +101,7 @@ public class ReservaServicioService {
         }).toList();
     }
 
-    @Autowired
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
     @Transactional
     public CrearReservaResponse crearReserva(String email, CrearReservaRequest request) {

@@ -1,9 +1,10 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.Collections;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -16,10 +17,10 @@ import Fabrica_EAP05.Reservas.Service.AgendaService;
 
 @RestController
 @RequestMapping("/api/agenda")
+@RequiredArgsConstructor
 public class AgendaController {
 
-    @Autowired
-    private AgendaService agendaService;
+    private final AgendaService agendaService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('proveedor', 'PROVEEDOR')")

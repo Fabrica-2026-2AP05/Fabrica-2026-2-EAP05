@@ -1,9 +1,10 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -23,10 +24,10 @@ import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 // hacia auth.users, así que cualquier id insertado ahí debe existir primero
 // en Supabase Auth.
 @Service
+@RequiredArgsConstructor
 public class SupabaseAuthService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
     @Value("${supabase.url}")
     private String supabaseUrl;

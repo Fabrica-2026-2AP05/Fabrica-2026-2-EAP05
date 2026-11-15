@@ -1,7 +1,8 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,10 +21,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/usuario")
 @Tag(name = "Usuarios", description = "Registro de clientes y proveedores")
+@RequiredArgsConstructor
 public class UsuarioController {
 
-    @Autowired
-    private IUsuarioService usuarioService;
+    private final IUsuarioService usuarioService;
 
     @Operation(summary = "Registrar cliente",
             description = "Registro público de un usuario con rol cliente. Se envía un correo para establecer la contraseña.")

@@ -1,12 +1,13 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import Fabrica_EAP05.Reservas.DTO.AgendaResponse;
@@ -18,16 +19,14 @@ import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
+@RequiredArgsConstructor
 public class AgendaService {
 
-    @Autowired
-    private ReservaServicioRepository reservaServicioRepository;
+    private final ReservaServicioRepository reservaServicioRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private HorarioRepository horarioRepository;
+    private final HorarioRepository horarioRepository;
 
     public List<AgendaResponse> consultarAgendaProveedor(String emailProveedor) {
         Usuario proveedor = usuarioRepository.findByEmail(emailProveedor)
