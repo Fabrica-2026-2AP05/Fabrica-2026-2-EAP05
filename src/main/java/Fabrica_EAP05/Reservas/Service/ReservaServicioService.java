@@ -27,6 +27,8 @@ import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import jakarta.persistence.EntityManager;
+import java.util.List;
+import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
 
 @Service
 public class ReservaServicioService {
@@ -207,5 +209,53 @@ public class ReservaServicioService {
             reserva.getId(),
             reserva.getEstado().name(),
             aOffset(reserva.getCanceladaEn()));
-}
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistorialProveedorResponse> consultarHistorialProveedor(String email) {
+        Usuario proveedor = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(proveedor.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<ReservaServicio> reservas = reservaServicioRepository.findHistorialByProveedorId(proveedor.getId());
+
+        return reservas.stream().map(reserva -> {
+            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            String nombreCliente = usuarioRepository.findById(reserva.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (reserva.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            return new HistorialProveedorResponse(
+                    reserva.getId(),
+                    reserva.getServicioId(),
+                    nombreServicio,
+                    reserva.getClienteId(),
+                    nombreCliente,
+                    reserva.getHorarioId(),
+                    inicio,
+                    fin,
+                    reserva.getRecursoId(),
+                    nombreRecurso,
+                    reserva.getEstado().name(),
+                    aOffset(reserva.getCreadaEn())
+            );
+        }).toList();
+    }
 }

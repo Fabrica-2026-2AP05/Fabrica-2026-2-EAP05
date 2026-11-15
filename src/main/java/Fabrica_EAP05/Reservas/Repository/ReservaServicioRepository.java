@@ -33,6 +33,13 @@ public interface ReservaServicioRepository extends JpaRepository<ReservaServicio
             "AND h.proveedorId = :proveedorId")
     List<ReservaServicio> findByProveedorId(@Param("proveedorId") UUID proveedorId);
 
+    // Consulta de historial para la HU24 ordenada por fecha de creación
+    @Query("SELECT r FROM ReservaServicio r, Horario h " +
+            "WHERE r.horarioId = h.id " +
+            "AND h.proveedorId = :proveedorId " +
+            "ORDER BY r.creadaEn DESC")
+    List<ReservaServicio> findHistorialByProveedorId(@Param("proveedorId") UUID proveedorId);
+
     @Query("SELECT COUNT(r) FROM ReservaServicio r, Horario h "
             + "WHERE r.horarioId = h.id "
             + "AND r.recursoId = :recursoId "

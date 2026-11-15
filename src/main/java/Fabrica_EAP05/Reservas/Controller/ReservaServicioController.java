@@ -1,20 +1,18 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import Fabrica_EAP05.Reservas.DTO.CrearReservaRequest;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaResponse;
@@ -93,6 +91,34 @@ public class ReservaServicioController {
         try {
             java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> historial =
                     reservaServicioService.consultarHistorialCliente(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar historial de reservas como proveedor",
+            description = "Retorna el historial de reservas asociadas a los servicios/horarios del proveedor autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol proveedor)")
+    })
+    @GetMapping("/historial-proveedor")
+    @PreAuthorize("hasAnyRole('proveedor', 'PROVEEDOR')")
+    public ResponseEntity<?> consultarHistorialProveedor(@AuthenticationPrincipal String email) {
+        try {
+            List<HistorialProveedorResponse> historial =
+                    reservaServicioService.consultarHistorialProveedor(email);
 
             if (historial.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
