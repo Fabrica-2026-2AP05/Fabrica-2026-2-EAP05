@@ -46,4 +46,20 @@ public class ReservaEvento {
     public EstadoReserva getEstado() {
         return estado;
     }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public void setClienteId(UUID clienteId) {
+        this.clienteId = clienteId;
+    }
+
+    public void setEventoId(UUID eventoId) {
+        this.eventoId = eventoId;
+    }
+
+    public void setEstado(EstadoReserva estado) {
+        this.estado = estado;
+    }
 }

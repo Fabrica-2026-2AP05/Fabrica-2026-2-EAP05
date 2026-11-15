@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +19,7 @@ import Fabrica_EAP05.Reservas.DTO.DefinirCapacidadEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
+import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
 import Fabrica_EAP05.Reservas.Service.EventoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -82,5 +84,25 @@ public class EventoController {
             @PathVariable UUID id,
             @Valid @RequestBody DefinirCapacidadEventoRequest request) {
         return ResponseEntity.ok(eventoService.definirCapacidad(id, request.getCapacidad()));
+    }
+
+    @Operation(summary = "Reservar cupo en evento",
+        description = "Reserva un cupo del evento para el cliente autenticado (sin body; el cliente sale del token). "
+                + "La reserva queda confirmada y los cupos disponibles disminuyen en uno.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Reserva confirmada; incluye los cupos restantes"),
+            @ApiResponse(responseCode = "400", description = "El id del evento no tiene formato UUID válido"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente) o usuario inactivo"),
+            @ApiResponse(responseCode = "404", description = "El evento no existe"),
+            @ApiResponse(responseCode = "409", description = "No hay cupos disponibles, el evento no está activo "
+                    + "o el cliente ya tiene una reserva confirmada en el evento")
+    })
+    @PostMapping("/{id}/reservas")
+    @PreAuthorize("hasRole('cliente')")
+    public ResponseEntity<ReservaEventoResponse> reservarCupo(@PathVariable UUID id,
+                                                              Authentication authentication) {
+        ReservaEventoResponse response = eventoService.reservarCupo(authentication.getName(), id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }
