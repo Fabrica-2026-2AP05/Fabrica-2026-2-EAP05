@@ -60,12 +60,13 @@ public class AuthService {
         // 0. Verificar si el usuario está bloqueado
         loginAttemptService.verificarBloqueo(dto.getEmail());
 
-        // 1. Buscar perfil local primero y validar si está activo
-        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new CredencialesInvalidasException("Credenciales inválidas"));
-
-        if (Boolean.FALSE.equals(usuario.getActivo())) {
-            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
+        // 1. Buscar perfil local primero y validar si está activo.
+        //    Email inexistente o usuario inactivo cuentan como intento fallido y
+        //    responden el mismo mensaje, para no revelar si el email existe.
+        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail()).orElse(null);
+        if (usuario == null || Boolean.FALSE.equals(usuario.getActivo())) {
+            loginAttemptService.registrarFallo(dto.getEmail());
+            throw new CredencialesInvalidasException("Credenciales inválidas");
         }
 
         // 2. Validar credenciales contra Supabase Auth
