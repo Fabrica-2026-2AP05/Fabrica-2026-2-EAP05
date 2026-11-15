@@ -1,5 +1,6 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
@@ -21,6 +23,7 @@ import Fabrica_EAP05.Reservas.Exception.CapacidadInsuficienteException;
 import Fabrica_EAP05.Reservas.Exception.ConflictoDisponibilidadException;
 import Fabrica_EAP05.Reservas.Exception.CupoAgotadoException;
 import Fabrica_EAP05.Reservas.Exception.EventoNoEncontradoException;
+import Fabrica_EAP05.Reservas.Exception.PlazoCancelacionException;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
 import Fabrica_EAP05.Reservas.Repository.EventoRepository;
@@ -36,6 +39,12 @@ public class EventoService {
     private EventoRepository eventoRepository;
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    // HU22: horas mínimas de anticipación para cancelar una reserva de evento
+    static final long HORAS_MINIMAS_CANCELACION = 12;
+
+    // Reloj del sistema en la zona de la JVM; los tests lo reemplazan por uno fijo
+    private Clock clock = Clock.systemDefaultZone();
 
     @Transactional
     public RegistroEventoResponse registrarEvento(RegistrarEventoRequest request) {
@@ -170,6 +179,50 @@ public class EventoService {
                 guardada.getClienteId(),
                 guardada.getEstado().name(),
                 cuposRestantes);
+    }
+
+    // HU22: el cliente cancela su reserva de evento y el cupo vuelve a quedar disponible
+    @Transactional
+    public CancelarReservaEventoResponse cancelarReservaEvento(String emailCliente, UUID eventoId, UUID reservaId) {
+        // a. Cliente autenticado y activo
+        Usuario cliente = usuarioRepository.findByEmail(emailCliente)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+        if (!Boolean.TRUE.equals(cliente.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        // b. Mismo mensaje si no existe, es de otro cliente o de otro evento: no se revela cuál
+        ReservaEvento reserva = reservaEventoRepository.findById(reservaId)
+                .filter(r -> cliente.getId().equals(r.getClienteId()) && eventoId.equals(r.getEventoId()))
+                .orElseThrow(() -> new EventoNoEncontradoException("La reserva no existe"));
+
+        // c. Solo se cancela una reserva confirmada
+        if (reserva.getEstado() != EstadoReserva.confirmada) {
+            throw new ConflictoDisponibilidadException("La reserva no está confirmada, no se puede cancelar");
+        }
+
+        // d. Plazo mínimo: deben faltar al menos HORAS_MINIMAS_CANCELACION para el inicio
+        Evento evento = eventoRepository.findById(eventoId)
+                .orElseThrow(() -> new EventoNoEncontradoException("El evento no existe"));
+        if (ahora().plusHours(HORAS_MINIMAS_CANCELACION).isAfter(evento.getInicio())) {
+            throw new PlazoCancelacionException("No se puede cancelar: faltan menos de "
+                    + HORAS_MINIMAS_CANCELACION + " horas para el inicio del evento");
+        }
+
+        // e. Cancelar; el cupo se libera porque solo cuentan las reservas confirmadas
+        reserva.setEstado(EstadoReserva.cancelada);
+        ReservaEvento guardada = reservaEventoRepository.saveAndFlush(reserva);
+
+        return new CancelarReservaEventoResponse(
+                guardada.getId(),
+                guardada.getEventoId(),
+                guardada.getClienteId(),
+                guardada.getEstado().name());
+    }
+
+    // Único punto para obtener "ahora", en la misma zona en que se mapea Evento.inicio
+    private LocalDateTime ahora() {
+        return LocalDateTime.now(clock);
     }
 
     // Las entidades mapean timestamptz como LocalDateTime en la zona de la JVM

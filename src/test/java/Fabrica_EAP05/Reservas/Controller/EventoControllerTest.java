@@ -1,8 +1,10 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
 import Fabrica_EAP05.Reservas.Exception.CupoAgotadoException;
 import Fabrica_EAP05.Reservas.Exception.EventoNoEncontradoException;
+import Fabrica_EAP05.Reservas.Exception.PlazoCancelacionException;
 import Fabrica_EAP05.Reservas.Service.EventoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,5 +63,30 @@ class EventoControllerTest {
                 .thenThrow(new EventoNoEncontradoException("El evento no existe"));
         // Act + Assert
         assertThrows(EventoNoEncontradoException.class, () -> controller.reservarCupo(eventoId, authentication));
+    }
+
+    @Test void cancelarReservaEvento_dentroDePlazo_retornaOk() {
+        // Arrange
+        UUID reservaId = UUID.randomUUID();
+        CancelarReservaEventoResponse resultado = new CancelarReservaEventoResponse(
+                reservaId, eventoId, UUID.randomUUID(), "cancelada");
+        when(eventoService.cancelarReservaEvento(email, eventoId, reservaId)).thenReturn(resultado);
+        // Act
+        ResponseEntity<CancelarReservaEventoResponse> respuesta =
+                controller.cancelarReservaEvento(eventoId, reservaId, authentication);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.OK, respuesta.getStatusCode()),
+                () -> assertSame(resultado, respuesta.getBody()));
+    }
+
+    // El 409 lo arma GlobalExceptionHandler; el controller solo propaga
+    @Test void cancelarReservaEvento_fueraDePlazo_propagaExcepcion() {
+        // Arrange
+        UUID reservaId = UUID.randomUUID();
+        when(eventoService.cancelarReservaEvento(email, eventoId, reservaId))
+                .thenThrow(new PlazoCancelacionException("No se puede cancelar: faltan menos de 12 horas"));
+        // Act + Assert
+        assertThrows(PlazoCancelacionException.class,
+                () -> controller.cancelarReservaEvento(eventoId, reservaId, authentication));
     }
 }
