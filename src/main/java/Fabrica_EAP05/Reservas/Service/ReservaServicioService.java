@@ -3,6 +3,7 @@ package Fabrica_EAP05.Reservas.Service;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -146,7 +147,7 @@ public class ReservaServicioService {
     // Mismo mensaje si no existe o es de otro cliente: no se revela cuál de las dos
     ReservaServicio reserva = reservaServicioRepository.findByIdParaActualizar(reservaId)
             .filter(r -> r.getClienteId().equals(cliente.getId()))
-            .orElseThrow(() -> new IllegalArgumentException("La reserva no existe"));
+            .orElseThrow(() -> new NoSuchElementException("La reserva no existe"));
 
     if (reserva.getEstado() != EstadoReserva.confirmada) {
         throw new IllegalStateException("La reserva no está confirmada, no se puede cancelar");
