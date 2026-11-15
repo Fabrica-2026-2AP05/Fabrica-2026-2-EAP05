@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -40,7 +41,12 @@ public class SecurityConfig {
 
     @Autowired
     private JwtFilter jwtFilter;
-    
+
+    // Orígenes autorizados para CORS. En producción se definen con la variable de
+    // entorno APP_CORS_ALLOWED_ORIGINS (lista separada por comas).
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private List<String> allowedOrigins;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,7 +59,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
 
