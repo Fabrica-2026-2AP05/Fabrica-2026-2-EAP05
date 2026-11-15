@@ -36,6 +36,7 @@ import Fabrica_EAP05.Reservas.Entities.Evento;
 import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
 import Fabrica_EAP05.Reservas.Repository.EventoRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
+import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 
 @Service
 public class ReservaServicioService {
@@ -357,4 +358,52 @@ public class ReservaServicioService {
 
         return historial;
     }
+
+    @Transactional(readOnly = true)
+    public List<OcupacionServicioResponse> consultarOcupacionServicios(
+            String email, LocalDateTime desde, LocalDateTime hasta) {
+
+        if (desde == null || hasta == null) {
+            throw new IllegalArgumentException("Las fechas 'desde' y 'hasta' son obligatorias");
+        }
+        if (!desde.isBefore(hasta)) {
+            throw new IllegalArgumentException("La fecha 'desde' debe ser anterior a 'hasta'");
+        }
+
+        Usuario admin = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(admin.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<OcupacionServicioResponse> reporte = new ArrayList<>();
+
+        for (Servicio servicio : servicioRepository.findAll()) {
+            long totalHorarios = horarioRepository.contarHorariosOfertadosPorServicioEnPeriodo(
+                    servicio.getId(), EstadoHorario.bloqueado, desde, hasta);
+
+            long horariosReservados = reservaServicioRepository.contarReservasConfirmadasPorServicioEnPeriodo(
+                    servicio.getId(), EstadoReserva.confirmada, desde, hasta);
+            // Si este servicio no tiene horarios ni reservas en el periodo, no entra en el reporte
+            if (totalHorarios == 0 && horariosReservados == 0) {
+                continue;
+            }
+
+            double porcentaje = totalHorarios > 0
+                    ? Math.round(((horariosReservados * 100.0) / totalHorarios) * 100.0) / 100.0
+                    : 0.0;
+
+            reporte.add(new OcupacionServicioResponse(
+                    servicio.getId(),
+                    servicio.getNombre(),
+                    totalHorarios,
+                    horariosReservados,
+                    porcentaje
+            ));
+        }
+
+        return reporte;
+    }
+
 }
