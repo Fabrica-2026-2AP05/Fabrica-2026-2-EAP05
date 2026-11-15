@@ -1,24 +1,30 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioResponse;
+import Fabrica_EAP05.Reservas.DTO.UsoServicioResponse;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 import Fabrica_EAP05.Reservas.Service.ServicioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,11 +37,37 @@ import lombok.Setter;
 
 @RestController
 @RequestMapping("/api/servicios")
-@Tag(name = "Servicios", description = "Registro y modificación de servicios. Solo administradores.")
+@Tag(name = "Servicios", description = "Registro, modificación y reporte de uso de servicios. Solo administradores.")
 public class ServicioController {
 
     @Autowired
     private ServicioService servicioService;
+
+    // Declarada antes de las rutas /{servicioId} para que "uso" nunca se interprete como un id.
+    // Los errores 400 (fechas inválidas o desde >= hasta) los arma GlobalExceptionHandler.
+    @Operation(summary = "Consultar uso de servicios",
+            description = "Cantidad de reservas por servicio creadas en el periodo [desde, hasta), "
+                    + "incluidas las canceladas. Incluye los servicios sin reservas (0), ordenados de más "
+                    + "a menos usado. Fechas en formato ISO, por ejemplo 2026-12-01T00:00:00. Solo administradores.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de reservas por servicio, o "
+                    + "{\"mensaje\": \"No existen datos de uso para el periodo consultado.\"} si no hay reservas"),
+            @ApiResponse(responseCode = "400", description = "Fechas faltantes, con formato inválido, "
+                    + "o 'desde' no es anterior a 'hasta'"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/uso")
+    @PreAuthorize("hasRole('administrador')")
+    public ResponseEntity<?> reporteUso(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
+        List<UsoServicioResponse> reporte = servicioService.reporteUso(desde, hasta);
+        if (reporte.isEmpty()) {
+            return ResponseEntity.ok(Map.of("mensaje", "No existen datos de uso para el periodo consultado."));
+        }
+        return ResponseEntity.ok(reporte);
+    }
 
     @Getter
     @Setter
