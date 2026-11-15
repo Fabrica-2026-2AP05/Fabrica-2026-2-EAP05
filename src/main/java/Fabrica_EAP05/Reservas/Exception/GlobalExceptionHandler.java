@@ -139,6 +139,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    @ExceptionHandler(PlazoCancelacionException.class)
+    public ResponseEntity<Map<String, Object>> handlePlazoCancelacion(PlazoCancelacionException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", OffsetDateTime.now());
+        body.put("mensaje", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(CapacidadInsuficienteException.class)
     public ResponseEntity<Map<String, Object>> handleCapacidadInsuficiente(CapacidadInsuficienteException ex) {
         Map<String, Object> body = new HashMap<>();

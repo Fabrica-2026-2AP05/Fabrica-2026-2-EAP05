@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.DefinirCapacidadEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
@@ -104,5 +105,25 @@ public class EventoController {
                                                               Authentication authentication) {
         ReservaEventoResponse response = eventoService.reservarCupo(authentication.getName(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(summary = "Cancelar reserva de evento",
+        description = "Cancela una reserva confirmada del cliente autenticado y libera el cupo. "
+                + "Solo se permite si faltan al menos 12 horas para el inicio del evento.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reserva cancelada; el cupo vuelve a estar disponible"),
+            @ApiResponse(responseCode = "400", description = "Algún id no tiene formato UUID válido"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente) o usuario inactivo"),
+            @ApiResponse(responseCode = "404", description = "La reserva o el evento no existe, o la reserva es de otro cliente"),
+            @ApiResponse(responseCode = "409", description = "La reserva no está confirmada o faltan menos de 12 horas "
+                    + "para el inicio del evento")
+    })
+    @PostMapping("/{id}/reservas/{reservaId}/cancelar")
+    @PreAuthorize("hasRole('cliente')")
+    public ResponseEntity<CancelarReservaEventoResponse> cancelarReservaEvento(@PathVariable UUID id,
+                                                                               @PathVariable UUID reservaId,
+                                                                               Authentication authentication) {
+        return ResponseEntity.ok(eventoService.cancelarReservaEvento(authentication.getName(), id, reservaId));
     }
 }
