@@ -79,4 +79,32 @@ public class ReservaServicioController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("mensaje", e.getMessage()));
         }
     }
+
+    @Operation(summary = "Consultar historial de reservas",
+            description = "Retorna el historial de reservas realizadas por el cliente autenticado junto con su estado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente)")
+    })
+    @org.springframework.web.bind.annotation.GetMapping("/historial")
+    @PreAuthorize("hasRole('cliente')")
+    public ResponseEntity<?> consultarHistorial(@AuthenticationPrincipal String email) {
+        try {
+            java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> historial =
+                    reservaServicioService.consultarHistorialCliente(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
 }
