@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
+import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
@@ -218,6 +220,38 @@ public class EventoService {
                 guardada.getEventoId(),
                 guardada.getClienteId(),
                 guardada.getEstado().name());
+    }
+
+    // HU28: ocupación de los eventos que inician en [desde, hasta).
+    // Si ningún evento del periodo tiene reservas confirmadas, devuelve lista vacía.
+    @Transactional(readOnly = true)
+    public List<OcupacionEventoResponse> reporteOcupacion(LocalDateTime desde, LocalDateTime hasta) {
+        if (desde == null || hasta == null) {
+            throw new IllegalArgumentException("Los parámetros 'desde' y 'hasta' son obligatorios");
+        }
+        if (!desde.isBefore(hasta)) {
+            throw new IllegalArgumentException("La fecha 'desde' debe ser anterior a la fecha 'hasta'");
+        }
+
+        List<OcupacionEventoResponse> reporte = eventoRepository.findByPeriodo(desde, hasta).stream()
+                .map(e -> {
+                    long reservados = reservaEventoRepository
+                            .countByEventoIdAndEstado(e.getId(), EstadoReserva.confirmada);
+                    return new OcupacionEventoResponse(e.getId(), e.getNombre(), e.getCapacidad(),
+                            reservados, porcentajeOcupacion(reservados, e.getCapacidad()));
+                })
+                .toList();
+
+        boolean hayReservas = reporte.stream().anyMatch(o -> o.getReservados() > 0);
+        return hayReservas ? reporte : List.of();
+    }
+
+    // Porcentaje con 1 decimal; capacidad 0 o nula -> 0 (sin dividir por cero)
+    private double porcentajeOcupacion(long reservados, Integer capacidad) {
+        if (capacidad == null || capacidad <= 0) {
+            return 0.0;
+        }
+        return Math.round(reservados * 1000.0 / capacidad) / 10.0;
     }
 
     // Único punto para obtener "ahora", en la misma zona en que se mapea Evento.inicio

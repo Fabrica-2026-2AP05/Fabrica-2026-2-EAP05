@@ -1,6 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
+import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
 import Fabrica_EAP05.Reservas.Entities.Evento;
 import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
@@ -29,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -362,6 +364,117 @@ class EventoServiceTest {
                 () -> eventoService.cancelarReservaEvento(email, evento.getId(), UUID.randomUUID()));
 
         // Assert
+        verifyNoInteractions(eventoRepository, reservaEventoRepository);
+    }
+
+    // ---------- HU28: ocupación de eventos ----------
+
+    private final LocalDateTime desde = LocalDateTime.of(2026, 12, 1, 0, 0);
+    private final LocalDateTime hasta = LocalDateTime.of(2027, 1, 1, 0, 0);
+
+    private Evento eventoConCapacidad(String nombre, Integer capacidad) {
+        Evento e = new Evento();
+        e.setId(UUID.randomUUID());
+        e.setNombre(nombre);
+        e.setCapacidad(capacidad);
+        e.setActivo(true);
+        e.setInicio(LocalDateTime.of(2026, 12, 10, 9, 0));
+        return e;
+    }
+
+    @Test @DisplayName("HU28 Escenario 1 - Muestra reservados y porcentaje de ocupación por evento")
+    void reporteOcupacion_eventosConReservas_calculaPorcentaje() {
+        // Arrange
+        Evento taller = eventoConCapacidad("Taller", 3);
+        Evento charla = eventoConCapacidad("Charla", 40);
+        when(eventoRepository.findByPeriodo(desde, hasta)).thenReturn(List.of(taller, charla));
+        when(reservaEventoRepository.countByEventoIdAndEstado(taller.getId(), EstadoReserva.confirmada)).thenReturn(1L);
+        when(reservaEventoRepository.countByEventoIdAndEstado(charla.getId(), EstadoReserva.confirmada)).thenReturn(0L);
+
+        // Act
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+
+        // Assert
+        assertAll(() -> assertEquals(2, reporte.size()),
+                () -> assertEquals(taller.getId(), reporte.get(0).getEventoId()),
+                () -> assertEquals("Taller", reporte.get(0).getNombre()),
+                () -> assertEquals(3, reporte.get(0).getCapacidad()),
+                () -> assertEquals(1L, reporte.get(0).getReservados()),
+                () -> assertEquals(33.3, reporte.get(0).getPorcentajeOcupacion()),   // 1/3 con 1 decimal
+                () -> assertEquals(0L, reporte.get(1).getReservados()),
+                () -> assertEquals(0.0, reporte.get(1).getPorcentajeOcupacion()));
+    }
+
+    @Test @DisplayName("HU28 - Evento lleno: 100% de ocupación")
+    void reporteOcupacion_eventoLleno_cienPorCiento() {
+        // Arrange
+        Evento taller = eventoConCapacidad("Taller", 8);
+        when(eventoRepository.findByPeriodo(desde, hasta)).thenReturn(List.of(taller));
+        when(reservaEventoRepository.countByEventoIdAndEstado(taller.getId(), EstadoReserva.confirmada)).thenReturn(8L);
+
+        // Act
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+
+        // Assert
+        assertEquals(100.0, reporte.get(0).getPorcentajeOcupacion());
+    }
+
+    @Test @DisplayName("HU28 - Capacidad 0 o nula: porcentaje 0 sin dividir por cero")
+    void reporteOcupacion_capacidadCeroONula_porcentajeCero() {
+        // Arrange
+        Evento sinCapacidad = eventoConCapacidad("Sin capacidad", 0);
+        Evento capacidadNula = eventoConCapacidad("Capacidad nula", null);
+        when(eventoRepository.findByPeriodo(desde, hasta)).thenReturn(List.of(sinCapacidad, capacidadNula));
+        when(reservaEventoRepository.countByEventoIdAndEstado(sinCapacidad.getId(), EstadoReserva.confirmada)).thenReturn(2L);
+        when(reservaEventoRepository.countByEventoIdAndEstado(capacidadNula.getId(), EstadoReserva.confirmada)).thenReturn(1L);
+
+        // Act
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+
+        // Assert
+        assertAll(() -> assertEquals(0.0, reporte.get(0).getPorcentajeOcupacion()),
+                () -> assertEquals(2L, reporte.get(0).getReservados()),
+                () -> assertEquals(0.0, reporte.get(1).getPorcentajeOcupacion()));
+    }
+
+    @Test @DisplayName("HU28 Escenario 2 - Sin eventos en el periodo: lista vacía")
+    void reporteOcupacion_sinEventos_retornaListaVacia() {
+        // Arrange
+        when(eventoRepository.findByPeriodo(desde, hasta)).thenReturn(List.of());
+
+        // Act
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+
+        // Assert
+        assertTrue(reporte.isEmpty());
+        verifyNoInteractions(reservaEventoRepository);
+    }
+
+    @Test @DisplayName("HU28 Escenario 2 - Eventos sin ninguna reserva confirmada: lista vacía")
+    void reporteOcupacion_eventosSinReservas_retornaListaVacia() {
+        // Arrange
+        Evento taller = eventoConCapacidad("Taller", 10);
+        when(eventoRepository.findByPeriodo(desde, hasta)).thenReturn(List.of(taller));
+        when(reservaEventoRepository.countByEventoIdAndEstado(taller.getId(), EstadoReserva.confirmada)).thenReturn(0L);
+
+        // Act
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+
+        // Assert
+        assertTrue(reporte.isEmpty());
+    }
+
+    @Test @DisplayName("HU28 - Rechaza un periodo donde 'desde' no es anterior a 'hasta'")
+    void reporteOcupacion_desdeNoAnteriorAHasta_lanzaExcepcion() {
+        // Act
+        IllegalArgumentException igual = assertThrows(IllegalArgumentException.class,
+                () -> eventoService.reporteOcupacion(desde, desde));
+        IllegalArgumentException invertido = assertThrows(IllegalArgumentException.class,
+                () -> eventoService.reporteOcupacion(hasta, desde));
+
+        // Assert
+        assertAll(() -> assertEquals("La fecha 'desde' debe ser anterior a la fecha 'hasta'", igual.getMessage()),
+                () -> assertEquals("La fecha 'desde' debe ser anterior a la fecha 'hasta'", invertido.getMessage()));
         verifyNoInteractions(eventoRepository, reservaEventoRepository);
     }
 }

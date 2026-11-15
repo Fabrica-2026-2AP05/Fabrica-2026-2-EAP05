@@ -1,23 +1,30 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.DefinirCapacidadEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
+import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
@@ -35,6 +42,31 @@ public class EventoController {
 
     @Autowired
     private EventoService eventoService;
+
+    // Declarada antes de las rutas /{id} para que "ocupacion" nunca se interprete como un id
+    @Operation(summary = "Consultar ocupación de eventos",
+            description = "Para cada evento que inicia en el periodo [desde, hasta) muestra la capacidad, "
+                    + "los cupos reservados (reservas confirmadas) y el porcentaje de ocupación con 1 decimal. "
+                    + "Fechas en formato ISO, por ejemplo 2026-12-01T00:00:00. Solo administradores.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de ocupación por evento, o "
+                    + "{\"mensaje\": \"No existen datos de ocupación para el periodo consultado.\"} si no hay reservas"),
+            @ApiResponse(responseCode = "400", description = "Fechas faltantes, con formato inválido, "
+                    + "o 'desde' no es anterior a 'hasta'"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/ocupacion")
+    @PreAuthorize("hasRole('administrador')")
+    public ResponseEntity<?> reporteOcupacion(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
+        List<OcupacionEventoResponse> reporte = eventoService.reporteOcupacion(desde, hasta);
+        if (reporte.isEmpty()) {
+            return ResponseEntity.ok(Map.of("mensaje", "No existen datos de ocupación para el periodo consultado."));
+        }
+        return ResponseEntity.ok(reporte);
+    }
 
     @Operation(summary = "Registrar evento",
             description = "Crea un nuevo evento. Solo administradores.")
