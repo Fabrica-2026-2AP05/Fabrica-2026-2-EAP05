@@ -1,15 +1,23 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import Fabrica_EAP05.Reservas.DTO.ConteoReservasServicio;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioResponse;
+import Fabrica_EAP05.Reservas.DTO.UsoServicioResponse;
 import Fabrica_EAP05.Reservas.Entities.Recurso;
 import Fabrica_EAP05.Reservas.Entities.Servicio;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
@@ -32,6 +40,32 @@ public class ServicioService {
 
     @Autowired
     private EntityManager entityManager;
+
+    // HU27: reservas por servicio creadas en [desde, hasta). Incluye los servicios en 0,
+    // ordenados de más a menos usado. Si no hay ninguna reserva en el periodo, lista vacía.
+    @Transactional(readOnly = true)
+    public List<UsoServicioResponse> reporteUso(LocalDateTime desde, LocalDateTime hasta) {
+        if (desde == null || hasta == null) {
+            throw new IllegalArgumentException("Los parámetros 'desde' y 'hasta' son obligatorios");
+        }
+        if (!desde.isBefore(hasta)) {
+            throw new IllegalArgumentException("La fecha 'desde' debe ser anterior a la fecha 'hasta'");
+        }
+
+        Map<UUID, Long> conteos = reservaServicioRepository.contarReservasPorServicioEnPeriodo(desde, hasta)
+                .stream()
+                .collect(Collectors.toMap(ConteoReservasServicio::servicioId, ConteoReservasServicio::reservas));
+        if (conteos.isEmpty()) {
+            return List.of();
+        }
+
+        return servicioRepository.findAll().stream()
+                .map(s -> new UsoServicioResponse(s.getId(), s.getNombre(), conteos.getOrDefault(s.getId(), 0L)))
+                .sorted(Comparator.comparingLong(UsoServicioResponse::getReservas).reversed()
+                        .thenComparing(UsoServicioResponse::getNombre,
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
 
     public boolean validarRecursoRequerido(UUID recursoId) {
         if (recursoId == null) {
