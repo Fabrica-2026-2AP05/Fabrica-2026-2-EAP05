@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -7,7 +9,6 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,14 +34,12 @@ import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
+@RequiredArgsConstructor
 public class EventoService {
 
-    @Autowired
-    private ReservaEventoRepository reservaEventoRepository;
-    @Autowired
-    private EventoRepository eventoRepository;
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final ReservaEventoRepository reservaEventoRepository;
+    private final EventoRepository eventoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     // HU22: horas mínimas de anticipación para cancelar una reserva de evento
     static final long HORAS_MINIMAS_CANCELACION = 12;

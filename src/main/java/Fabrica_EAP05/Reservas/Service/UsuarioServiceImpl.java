@@ -1,9 +1,10 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,16 +17,14 @@ import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class UsuarioServiceImpl implements IUsuarioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
-    @Autowired
-    private SupabaseAuthService supabaseAuthService;
+    private final SupabaseAuthService supabaseAuthService;
 
     @Override
     public UsuarioRegistroResponse registrarUsuario(UsuarioRegistroRequest request, Rol rolForzado) {

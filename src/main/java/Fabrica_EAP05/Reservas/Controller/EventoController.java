@@ -1,11 +1,12 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,10 +39,10 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/eventos")
 @Tag(name = "Eventos", description = "Gestión de eventos")
+@RequiredArgsConstructor
 public class EventoController {
 
-    @Autowired
-    private EventoService eventoService;
+    private final EventoService eventoService;
 
     // Declarada antes de las rutas /{id} para que "ocupacion" nunca se interprete como un id
     @Operation(summary = "Consultar ocupación de eventos",

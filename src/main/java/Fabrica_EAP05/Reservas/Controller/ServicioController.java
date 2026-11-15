@@ -1,12 +1,13 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,10 +39,10 @@ import lombok.Setter;
 @RestController
 @RequestMapping("/api/servicios")
 @Tag(name = "Servicios", description = "Registro, modificación y reporte de uso de servicios. Solo administradores.")
+@RequiredArgsConstructor
 public class ServicioController {
 
-    @Autowired
-    private ServicioService servicioService;
+    private final ServicioService servicioService;
 
     // Declarada antes de las rutas /{servicioId} para que "uso" nunca se interprete como un id.
     // Los errores 400 (fechas inválidas o desde >= hasta) los arma GlobalExceptionHandler.

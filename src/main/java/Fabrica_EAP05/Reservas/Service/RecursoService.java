@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -26,6 +28,7 @@ import jakarta.transaction.Transactional;
 
 
 @Service 
+@RequiredArgsConstructor
 public class RecursoService{
 
     @Autowired 
@@ -37,8 +40,7 @@ public class RecursoService{
     @Autowired 
     DisponibilidadRecursoRepository disponibilidadRecursoRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
 
 
