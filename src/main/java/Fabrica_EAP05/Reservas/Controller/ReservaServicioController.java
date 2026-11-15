@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
 import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
@@ -123,6 +124,34 @@ public class ReservaServicioController {
             if (historial.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
                         "mensaje", "No existen reservas registradas",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar historial global del negocio",
+            description = "Retorna todas las reservas de servicios y eventos del negocio con su estado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/historial-negocio")
+    @PreAuthorize("hasAnyRole('administrador', 'ADMIN')")
+    public ResponseEntity<?> consultarHistorialNegocio(@AuthenticationPrincipal String email) {
+        try {
+            List<HistorialNegocioResponse> historial =
+                    reservaServicioService.consultarHistorialNegocio(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas para el negocio",
                         "reservas", historial
                 ));
             }
