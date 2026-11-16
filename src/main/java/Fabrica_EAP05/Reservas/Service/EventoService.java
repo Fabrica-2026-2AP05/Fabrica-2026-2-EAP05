@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import Fabrica_EAP05.Reservas.DTO.CuposDisponiblesResponse;
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
@@ -132,6 +133,20 @@ public class EventoService {
                 guardado.getCreatedAt()
         );
     }
+    
+    public CuposDisponiblesResponse consultarCupos(UUID id) {
+        Evento evento = eventoRepository.findById(id)
+                .orElseThrow(() -> new EventoNoEncontradoException("El evento no existe"));
+
+        long confirmadas = reservaEventoRepository.countByEventoIdAndEstado(id, EstadoReserva.confirmada);
+        int disponibles = Math.max(0, evento.getCapacidad() - (int) confirmadas);
+
+        return new CuposDisponiblesResponse(
+                evento.getId(),
+                evento.getCapacidad(),
+                disponibles,
+                disponibles > 0
+        );
 
     // Reserva de cupo: el cliente toma un cupo de la capacidad del evento
     @Transactional

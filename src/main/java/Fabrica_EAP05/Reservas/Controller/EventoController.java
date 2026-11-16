@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import Fabrica_EAP05.Reservas.DTO.CuposDisponiblesResponse;
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.DefinirCapacidadEventoRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
@@ -119,6 +119,16 @@ public class EventoController {
             @Valid @RequestBody DefinirCapacidadEventoRequest request) {
         return ResponseEntity.ok(eventoService.definirCapacidad(id, request.getCapacidad()));
     }
+    @Operation(summary = "Consultar cupos disponibles",
+        description = "Muestra cuántos cupos quedan disponibles para el evento, según su capacidad y las reservas confirmadas.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cupos disponibles consultados"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "404", description = "El evento no existe")
+    })
+    @GetMapping("/{id}/cupos")
+    public ResponseEntity<CuposDisponiblesResponse> consultarCupos(@PathVariable UUID id) {
+        return ResponseEntity.ok(eventoService.consultarCupos(id));
 
     @Operation(summary = "Reservar cupo en evento",
         description = "Reserva un cupo del evento para el cliente autenticado (sin body; el cliente sale del token). "
