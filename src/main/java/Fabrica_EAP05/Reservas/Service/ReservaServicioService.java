@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaResponse;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaRequest;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaResponse;
+import Fabrica_EAP05.Reservas.DTO.HorarioDisponibleResponse;
 import Fabrica_EAP05.Reservas.Entities.Horario;
 import Fabrica_EAP05.Reservas.Entities.Recurso;
 import Fabrica_EAP05.Reservas.Entities.ReservaServicio;
@@ -28,7 +30,6 @@ import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import jakarta.persistence.EntityManager;
-import java.util.List;
 import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -138,18 +139,9 @@ public class ReservaServicioService {
         // 5. Recurso requerido: debe tener disponibilidad que cubra el horario
         //    y no estar ocupado por otra reserva confirmada en ese rango
         Recurso recurso = servicio.getRecurso();
-        if (recurso != null) {
-            boolean cubierto = !disponibilidadRecursoRepository
-                    .findByRecursoIdAndInicioLessThanEqualAndFinGreaterThanEqual(
-                            recurso.getId(), horario.getInicio(), horario.getFin())
-                    .isEmpty();
-            boolean ocupado = reservaServicioRepository.contarReservasDeRecursoEnRango(
-                    recurso.getId(), horario.getInicio(), horario.getFin()) > 0;
-
-            if (!Boolean.TRUE.equals(recurso.getActivo()) || !cubierto || ocupado) {
-                throw new IllegalStateException(
-                        "El recurso requerido no está disponible en el horario seleccionado");
-            }
+        if (recurso != null && !recursoDisponibleEn(recurso, horario)) {
+            throw new IllegalStateException(
+                    "El recurso requerido no está disponible en el horario seleccionado");
         }
 
         // 6. Crear la reserva
@@ -184,6 +176,38 @@ public class ReservaServicioService {
                 recargada.getEstado().name(),
                 aOffset(recargada.getCreadaEn())
         );
+    }
+
+    // HU14: horarios que el cliente puede reservar para un servicio
+    @Transactional(readOnly = true)
+    public List<HorarioDisponibleResponse> consultarDisponibilidad(UUID servicioId) {
+        Servicio servicio = servicioRepository.findById(servicioId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "El servicio con ID " + servicioId + " no existe en el sistema"));
+        if (!Boolean.TRUE.equals(servicio.getActivo())) {
+            throw new IllegalStateException("El servicio no está activo");
+        }
+
+        Recurso recurso = servicio.getRecurso();
+        return horarioRepository.findDisponiblesPorServicio(servicioId, LocalDateTime.now())
+                .stream()
+                .filter(h -> recurso == null || recursoDisponibleEn(recurso, h))
+                .map(h -> new HorarioDisponibleResponse(
+                        h.getId(), aOffset(h.getInicio()), aOffset(h.getFin()), h.getProveedorId()))
+                .toList();
+    }
+
+    // Misma regla para HU14 y HU15: recurso activo, con disponibilidad que cubra
+    // el rango del horario y sin reservas confirmadas que se solapen
+    private boolean recursoDisponibleEn(Recurso recurso, Horario horario) {
+        boolean cubierto = !disponibilidadRecursoRepository
+                .findByRecursoIdAndInicioLessThanEqualAndFinGreaterThanEqual(
+                        recurso.getId(), horario.getInicio(), horario.getFin())
+                .isEmpty();
+        boolean ocupado = reservaServicioRepository.contarReservasDeRecursoEnRango(
+                recurso.getId(), horario.getInicio(), horario.getFin()) > 0;
+
+        return Boolean.TRUE.equals(recurso.getActivo()) && cubierto && !ocupado;
     }
 
     // Las entidades mapean timestamptz como LocalDateTime en la zona de la JVM
