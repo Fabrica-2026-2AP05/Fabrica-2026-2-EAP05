@@ -1,8 +1,9 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,10 +35,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 @RestController
 @RequestMapping("/api/recursos")
 @Tag(name = "Recursos", description = "Gestión de recursos (salas, equipos, etc.)")
+@RequiredArgsConstructor
 public class RecursoController {
 
-    @Autowired
-    private RecursoService recursoService;
+    private final RecursoService recursoService;
 
     @Operation(summary = "Registrar recurso",
             description = "Crea un nuevo recurso. Solo administradores.")

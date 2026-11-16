@@ -1,12 +1,13 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 
 import jakarta.validation.Valid;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,10 +28,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Autenticación", description = "Inicio de sesión, cierre de sesión y restablecimiento de contraseña")
+@RequiredArgsConstructor
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
     @Operation(summary = "Iniciar sesión",
             description = "Valida las credenciales y devuelve un JWT para usar en el header Authorization: Bearer <token>.")
