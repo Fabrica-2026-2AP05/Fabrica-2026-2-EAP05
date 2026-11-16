@@ -15,6 +15,7 @@ import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
 import Fabrica_EAP05.Reservas.Repository.EventoRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ class EventoServiceTest {
     @Mock private ReservaEventoRepository reservaEventoRepository;
     @Mock private EventoRepository eventoRepository;
     @Mock private UsuarioRepository usuarioRepository;
+    @Mock private EntityManager entityManager;
     @InjectMocks private EventoService eventoService;
 
     private String email;
@@ -230,6 +232,7 @@ class EventoServiceTest {
         when(reservaEventoRepository.findById(reserva.getId())).thenReturn(Optional.of(reserva));
         when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
         when(reservaEventoRepository.saveAndFlush(reserva)).thenReturn(reserva);
+        LocalDateTime canceladaEnBase = simularRefreshConCanceladaEn(reserva);
 
         // Act
         CancelarReservaEventoResponse resultado =
@@ -241,8 +244,23 @@ class EventoServiceTest {
                 () -> assertEquals(cliente.getId(), resultado.getClienteId()),
                 () -> assertEquals("cancelada", resultado.getEstado()),
                 // Deja de contar como confirmada: el cupo queda libre
-                () -> assertEquals(EstadoReserva.cancelada, reserva.getEstado()));
-        verify(reservaEventoRepository).saveAndFlush(reserva);
+                () -> assertEquals(EstadoReserva.cancelada, reserva.getEstado()),
+                // cancelada_en viene de la base (leído con refresh), no de Java
+                () -> assertEquals(canceladaEnBase, reserva.getCanceladaEn()));
+        // refresh después de guardar, para leer lo que asignó la base
+        var orden = inOrder(reservaEventoRepository, entityManager);
+        orden.verify(reservaEventoRepository).saveAndFlush(reserva);
+        orden.verify(entityManager).refresh(reserva);
+    }
+
+    // Simula que la base asigna cancelada_en y que refresh lo carga en la entidad
+    private LocalDateTime simularRefreshConCanceladaEn(ReservaEvento reserva) {
+        LocalDateTime canceladaEnBase = LocalDateTime.of(2026, 11, 20, 10, 0, 7);
+        doAnswer(inv -> {
+            ((ReservaEvento) inv.getArgument(0)).setCanceladaEn(canceladaEnBase);
+            return null;
+        }).when(entityManager).refresh(reserva);
+        return canceladaEnBase;
     }
 
     @Test @DisplayName("HU22 - Exactamente 12 horas antes todavía se puede cancelar")
@@ -262,6 +280,7 @@ class EventoServiceTest {
 
         // Assert
         assertEquals("cancelada", resultado.getEstado());
+        verify(entityManager).refresh(reserva);
     }
 
     @Test @DisplayName("HU22 Escenario 2 - Rechaza la cancelación con menos de 12 horas")
@@ -281,7 +300,9 @@ class EventoServiceTest {
         // Assert
         assertTrue(error.getMessage().contains("menos de 12 horas"));
         assertEquals(EstadoReserva.confirmada, reserva.getEstado());
+        assertNull(reserva.getCanceladaEn());
         verify(reservaEventoRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(entityManager);
     }
 
     @Test @DisplayName("HU22 - Rechaza cancelar la reserva de otro cliente con mensaje genérico")
