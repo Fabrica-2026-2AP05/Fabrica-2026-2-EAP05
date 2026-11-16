@@ -4,6 +4,7 @@ import Fabrica_EAP05.Reservas.DTO.ModificarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioResponse;
+import Fabrica_EAP05.Reservas.DTO.UsoServicioResponse;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 import Fabrica_EAP05.Reservas.Service.ServicioService;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -140,5 +144,43 @@ class ServicioControllerTest {
         ResponseEntity<?> respuesta = controller.modificarServicio(servicioId, modificarRequest);
         // Assert
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, respuesta.getStatusCode());
+    }
+
+    // ---------- HU27: uso de servicios ----------
+
+    private final LocalDateTime desde = LocalDateTime.of(2026, 11, 1, 0, 0);
+    private final LocalDateTime hasta = LocalDateTime.of(2026, 12, 1, 0, 0);
+
+    @Test void reporteUso_conDatos_retornaLista() {
+        // Arrange
+        List<UsoServicioResponse> reporte = List.of(
+                new UsoServicioResponse(UUID.randomUUID(), "Masaje", 5L),
+                new UsoServicioResponse(UUID.randomUUID(), "Uñas", 0L));
+        when(service.reporteUso(desde, hasta)).thenReturn(reporte);
+        // Act
+        ResponseEntity<?> respuesta = controller.reporteUso(desde, hasta);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.OK, respuesta.getStatusCode()),
+                () -> assertEquals(reporte, respuesta.getBody()));
+    }
+
+    @Test void reporteUso_sinDatos_retornaMensaje() {
+        // Arrange
+        when(service.reporteUso(desde, hasta)).thenReturn(List.of());
+        // Act
+        ResponseEntity<?> respuesta = controller.reporteUso(desde, hasta);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.OK, respuesta.getStatusCode()),
+                () -> assertEquals(Map.of("mensaje", "No existen datos de uso para el periodo consultado."),
+                        respuesta.getBody()));
+    }
+
+    // El 400 lo arma GlobalExceptionHandler (IllegalArgumentException); el controller solo propaga
+    @Test void reporteUso_desdeNoAnteriorAHasta_propagaExcepcion() {
+        // Arrange
+        when(service.reporteUso(hasta, desde))
+                .thenThrow(new IllegalArgumentException("La fecha 'desde' debe ser anterior a la fecha 'hasta'"));
+        // Act + Assert
+        assertThrows(IllegalArgumentException.class, () -> controller.reporteUso(hasta, desde));
     }
 }

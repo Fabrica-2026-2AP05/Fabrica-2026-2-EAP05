@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -7,7 +9,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,27 +30,79 @@ import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import jakarta.persistence.EntityManager;
+import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
+import java.util.ArrayList;
+import java.util.Comparator;
+import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
+import Fabrica_EAP05.Reservas.Entities.Evento;
+import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
+import Fabrica_EAP05.Reservas.Repository.EventoRepository;
+import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
+import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 
 @Service
+@RequiredArgsConstructor
 public class ReservaServicioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private ServicioRepository servicioRepository;
+    private final ServicioRepository servicioRepository;
 
-    @Autowired
-    private HorarioRepository horarioRepository;
+    private final HorarioRepository horarioRepository;
 
-    @Autowired
-    private ReservaServicioRepository reservaServicioRepository;
+    private final ReservaServicioRepository reservaServicioRepository;
 
-    @Autowired
-    private DisponibilidadRecursoRepository disponibilidadRecursoRepository;
+    private final DisponibilidadRecursoRepository disponibilidadRecursoRepository;
 
-    @Autowired
-    private EntityManager entityManager;
+    private final Fabrica_EAP05.Reservas.Repository.RecursoRepository recursoRepository;
+
+    private final ReservaEventoRepository reservaEventoRepository;
+
+    private final EventoRepository eventoRepository;
+
+    @Transactional(readOnly = true)
+    public java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> consultarHistorialCliente(String email) {
+        Usuario cliente = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(cliente.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        java.util.List<ReservaServicio> reservas = reservaServicioRepository.findByClienteIdOrderByCreadaEnDesc(cliente.getId());
+
+        return reservas.stream().map(reserva -> {
+            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (reserva.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            return new Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse(
+                    reserva.getId(),
+                    reserva.getServicioId(),
+                    nombreServicio,
+                    reserva.getHorarioId(),
+                    inicio,
+                    fin,
+                    reserva.getRecursoId(),
+                    nombreRecurso,
+                    reserva.getEstado().name(),
+                    aOffset(reserva.getCreadaEn())
+            );
+        }).toList();
+    }
+
+    private final EntityManager entityManager;
 
     @Transactional
     public CrearReservaResponse crearReserva(String email, CrearReservaRequest request) {
@@ -172,7 +225,7 @@ public class ReservaServicioService {
     // Mismo mensaje si no existe o es de otro cliente: no se revela cuál de las dos
     ReservaServicio reserva = reservaServicioRepository.findByIdParaActualizar(reservaId)
             .filter(r -> r.getClienteId().equals(cliente.getId()))
-            .orElseThrow(() -> new IllegalArgumentException("La reserva no existe"));
+            .orElseThrow(() -> new NoSuchElementException("La reserva no existe"));
 
     if (reserva.getEstado() != EstadoReserva.confirmada) {
         throw new IllegalStateException("La reserva no está confirmada, no se puede cancelar");
@@ -187,5 +240,187 @@ public class ReservaServicioService {
             reserva.getId(),
             reserva.getEstado().name(),
             aOffset(reserva.getCanceladaEn()));
-}
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistorialProveedorResponse> consultarHistorialProveedor(String email) {
+        Usuario proveedor = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(proveedor.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<ReservaServicio> reservas = reservaServicioRepository.findHistorialByProveedorId(proveedor.getId());
+
+        return reservas.stream().map(reserva -> {
+            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            String nombreCliente = usuarioRepository.findById(reserva.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (reserva.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            return new HistorialProveedorResponse(
+                    reserva.getId(),
+                    reserva.getServicioId(),
+                    nombreServicio,
+                    reserva.getClienteId(),
+                    nombreCliente,
+                    reserva.getHorarioId(),
+                    inicio,
+                    fin,
+                    reserva.getRecursoId(),
+                    nombreRecurso,
+                    reserva.getEstado().name(),
+                    aOffset(reserva.getCreadaEn())
+            );
+        }).toList();
+
+
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistorialNegocioResponse> consultarHistorialNegocio(String email) {
+        Usuario admin = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(admin.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<HistorialNegocioResponse> historial = new ArrayList<>();
+
+        // 1. Traer todas las reservas de servicios
+        for (ReservaServicio r : reservaServicioRepository.findAll()) {
+            String nombreServicio = servicioRepository.findById(r.getServicioId())
+                    .map(Servicio::getNombre)
+                    .orElse("Servicio no disponible");
+
+            String nombreCliente = usuarioRepository.findById(r.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            Horario horario = horarioRepository.findById(r.getHorarioId()).orElse(null);
+            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
+            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+
+            String nombreRecurso = null;
+            if (r.getRecursoId() != null) {
+                nombreRecurso = recursoRepository.findById(r.getRecursoId())
+                        .map(Recurso::getNombre)
+                        .orElse(null);
+            }
+
+            historial.add(new HistorialNegocioResponse(
+                    r.getId(),
+                    "SERVICIO",
+                    r.getServicioId(),
+                    nombreServicio,
+                    r.getClienteId(),
+                    nombreCliente,
+                    inicio,
+                    fin,
+                    r.getRecursoId(),
+                    nombreRecurso,
+                    r.getEstado().name(),
+                    aOffset(r.getCreadaEn())
+            ));
+        }
+
+        // 2. Traer todas las reservas de eventos
+        for (ReservaEvento re : reservaEventoRepository.findAll()) {
+            Evento evento = eventoRepository.findById(re.getEventoId()).orElse(null);
+            String nombreEvento = evento != null ? evento.getNombre() : "Evento no disponible";
+            OffsetDateTime inicio = evento != null ? aOffset(evento.getInicio()) : null;
+            OffsetDateTime fin = evento != null ? aOffset(evento.getFin()) : null;
+
+            String nombreCliente = usuarioRepository.findById(re.getClienteId())
+                    .map(Usuario::getNombre)
+                    .orElse("Cliente no disponible");
+
+            historial.add(new HistorialNegocioResponse(
+                    re.getId(),
+                    "EVENTO",
+                    re.getEventoId(),
+                    nombreEvento,
+                    re.getClienteId(),
+                    nombreCliente,
+                    inicio,
+                    fin,
+                    null,
+                    null,
+                    re.getEstado().name(),
+                    null
+            ));
+        }
+
+        // 3. Ordenar todo por fecha de inicio (más recientes primero)
+        historial.sort(Comparator.comparing(
+                HistorialNegocioResponse::getInicio,
+                Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+
+        return historial;
+    }
+
+    @Transactional(readOnly = true)
+    public List<OcupacionServicioResponse> consultarOcupacionServicios(
+            String email, LocalDateTime desde, LocalDateTime hasta) {
+
+        if (desde == null || hasta == null) {
+            throw new IllegalArgumentException("Las fechas 'desde' y 'hasta' son obligatorias");
+        }
+        if (!desde.isBefore(hasta)) {
+            throw new IllegalArgumentException("La fecha 'desde' debe ser anterior a 'hasta'");
+        }
+
+        Usuario admin = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+
+        if (!Boolean.TRUE.equals(admin.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+
+        List<OcupacionServicioResponse> reporte = new ArrayList<>();
+
+        for (Servicio servicio : servicioRepository.findAll()) {
+            long totalHorarios = horarioRepository.contarHorariosOfertadosPorServicioEnPeriodo(
+                    servicio.getId(), EstadoHorario.bloqueado, desde, hasta);
+
+            long horariosReservados = reservaServicioRepository.contarReservasConfirmadasPorServicioEnPeriodo(
+                    servicio.getId(), EstadoReserva.confirmada, desde, hasta);
+            // Si este servicio no tiene horarios ni reservas en el periodo, no entra en el reporte
+            if (totalHorarios == 0 && horariosReservados == 0) {
+                continue;
+            }
+
+            double porcentaje = totalHorarios > 0
+                    ? Math.round(((horariosReservados * 100.0) / totalHorarios) * 100.0) / 100.0
+                    : 0.0;
+
+            reporte.add(new OcupacionServicioResponse(
+                    servicio.getId(),
+                    servicio.getNombre(),
+                    totalHorarios,
+                    horariosReservados,
+                    porcentaje
+            ));
+        }
+
+        return reporte;
+    }
+
 }

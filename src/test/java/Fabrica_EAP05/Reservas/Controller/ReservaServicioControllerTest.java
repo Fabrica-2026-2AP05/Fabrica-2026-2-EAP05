@@ -14,6 +14,8 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -102,9 +104,20 @@ class ReservaServicioControllerTest {
         assertEquals(HttpStatus.CONFLICT, respuesta.getStatusCode());
     }
 
-    @Test void cancelarReserva_inexistente_retornaBadRequest() {
+    @Test void cancelarReserva_inexistenteOAjena_retornaNotFound() {
         // Arrange
-        when(service.cancelarReserva(email, reservaId)).thenThrow(new IllegalArgumentException("No existe"));
+        when(service.cancelarReserva(email, reservaId)).thenThrow(new NoSuchElementException("La reserva no existe"));
+        // Act
+        ResponseEntity<?> respuesta = controller.cancelarReserva(reservaId, email);
+        // Assert
+        assertAll(() -> assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode()),
+                () -> assertEquals(Map.of("mensaje", "La reserva no existe"), respuesta.getBody()));
+    }
+
+    @Test void cancelarReserva_usuarioNoEncontrado_retornaBadRequest() {
+        // Arrange
+        when(service.cancelarReserva(email, reservaId))
+                .thenThrow(new IllegalArgumentException("Usuario autenticado no encontrado"));
         // Act
         ResponseEntity<?> respuesta = controller.cancelarReserva(reservaId, email);
         // Assert

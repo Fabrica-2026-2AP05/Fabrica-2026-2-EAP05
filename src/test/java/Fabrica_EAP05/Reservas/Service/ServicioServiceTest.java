@@ -1,9 +1,11 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import Fabrica_EAP05.Reservas.DTO.ConteoReservasServicio;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.ModificarServicioResponse;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioRequest;
 import Fabrica_EAP05.Reservas.DTO.RegistrarServicioResponse;
+import Fabrica_EAP05.Reservas.DTO.UsoServicioResponse;
 import Fabrica_EAP05.Reservas.Entities.Recurso;
 import Fabrica_EAP05.Reservas.Entities.Servicio;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
@@ -19,6 +21,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -208,5 +212,94 @@ class ServicioServiceTest {
 
         // Assert
         verifyNoInteractions(reservaRepository);
+    }
+
+    // ---------- HU27: uso de servicios ----------
+
+    private final LocalDateTime desde = LocalDateTime.of(2026, 11, 1, 0, 0);
+    private final LocalDateTime hasta = LocalDateTime.of(2026, 12, 1, 0, 0);
+
+    private Servicio servicioLlamado(String nombre) {
+        Servicio s = new Servicio();
+        s.setId(UUID.randomUUID());
+        s.setNombre(nombre);
+        return s;
+    }
+
+    @Test @DisplayName("HU27 Escenario 1 - Cantidad de reservas por servicio, de más a menos usado")
+    void reporteUso_conReservas_retornaConteosOrdenados() {
+        // Arrange
+        Servicio corte = servicioLlamado("Corte");
+        Servicio masaje = servicioLlamado("Masaje");
+        when(reservaRepository.contarReservasPorServicioEnPeriodo(desde, hasta)).thenReturn(List.of(
+                new ConteoReservasServicio(corte.getId(), 2L),
+                new ConteoReservasServicio(masaje.getId(), 5L)));
+        when(servicioRepository.findAll()).thenReturn(List.of(corte, masaje));
+
+        // Act
+        List<UsoServicioResponse> reporte = servicioService.reporteUso(desde, hasta);
+
+        // Assert
+        assertAll(() -> assertEquals(2, reporte.size()),
+                () -> assertEquals(masaje.getId(), reporte.get(0).getServicioId()),
+                () -> assertEquals("Masaje", reporte.get(0).getNombre()),
+                () -> assertEquals(5L, reporte.get(0).getReservas()),
+                () -> assertEquals(corte.getId(), reporte.get(1).getServicioId()),
+                () -> assertEquals(2L, reporte.get(1).getReservas()));
+    }
+
+    @Test @DisplayName("HU27 - Un servicio sin reservas en el periodo aparece con 0")
+    void reporteUso_servicioSinReservas_apareceEnCero() {
+        // Arrange
+        Servicio corte = servicioLlamado("Corte");
+        Servicio uñas = servicioLlamado("Uñas");
+        when(reservaRepository.contarReservasPorServicioEnPeriodo(desde, hasta)).thenReturn(List.of(
+                new ConteoReservasServicio(corte.getId(), 3L)));
+        when(servicioRepository.findAll()).thenReturn(List.of(uñas, corte));
+
+        // Act
+        List<UsoServicioResponse> reporte = servicioService.reporteUso(desde, hasta);
+
+        // Assert
+        assertAll(() -> assertEquals(2, reporte.size()),
+                () -> assertEquals(corte.getId(), reporte.get(0).getServicioId()),
+                () -> assertEquals(3L, reporte.get(0).getReservas()),
+                () -> assertEquals(uñas.getId(), reporte.get(1).getServicioId()),
+                () -> assertEquals(0L, reporte.get(1).getReservas()));
+    }
+
+    @Test @DisplayName("HU27 Escenario 2 - Sin reservas en el periodo: lista vacía")
+    void reporteUso_sinReservas_retornaListaVacia() {
+        // Arrange
+        when(reservaRepository.contarReservasPorServicioEnPeriodo(desde, hasta)).thenReturn(List.of());
+
+        // Act
+        List<UsoServicioResponse> reporte = servicioService.reporteUso(desde, hasta);
+
+        // Assert
+        assertTrue(reporte.isEmpty());
+        verify(servicioRepository, never()).findAll();
+    }
+
+    @Test @DisplayName("HU27 - Rechaza un periodo donde 'desde' no es anterior a 'hasta'")
+    void reporteUso_desdeNoAnteriorAHasta_lanzaExcepcion() {
+        // Act
+        IllegalArgumentException igual = assertThrows(IllegalArgumentException.class,
+                () -> servicioService.reporteUso(desde, desde));
+        IllegalArgumentException invertido = assertThrows(IllegalArgumentException.class,
+                () -> servicioService.reporteUso(hasta, desde));
+
+        // Assert
+        assertAll(() -> assertEquals("La fecha 'desde' debe ser anterior a la fecha 'hasta'", igual.getMessage()),
+                () -> assertEquals("La fecha 'desde' debe ser anterior a la fecha 'hasta'", invertido.getMessage()));
+        verifyNoInteractions(reservaRepository, servicioRepository);
+    }
+
+    @Test @DisplayName("HU27 - Rechaza fechas nulas")
+    void reporteUso_fechasNulas_lanzaExcepcion() {
+        // Act + Assert
+        assertThrows(IllegalArgumentException.class, () -> servicioService.reporteUso(null, hasta));
+        assertThrows(IllegalArgumentException.class, () -> servicioService.reporteUso(desde, null));
+        verifyNoInteractions(reservaRepository, servicioRepository);
     }
 }

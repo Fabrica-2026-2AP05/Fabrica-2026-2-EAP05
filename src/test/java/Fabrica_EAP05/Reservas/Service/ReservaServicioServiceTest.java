@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -228,7 +229,23 @@ class ReservaServicioServiceTest {
         when(reservaRepository.findByIdParaActualizar(reservaId)).thenReturn(Optional.of(reserva));
 
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+        NoSuchElementException error = assertThrows(NoSuchElementException.class,
+                () -> reservaService.cancelarReserva(email, reservaId));
+
+        // Assert
+        assertEquals("La reserva no existe", error.getMessage());
+        assertEquals(EstadoReserva.confirmada, reserva.getEstado());
+        verify(reservaRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Rechaza cancelar una reserva inexistente con el mismo mensaje")
+    void cancelarReserva_reservaInexistente_lanzaExcepcion() {
+        // Arrange
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(reservaRepository.findByIdParaActualizar(reservaId)).thenReturn(Optional.empty());
+
+        // Act
+        NoSuchElementException error = assertThrows(NoSuchElementException.class,
                 () -> reservaService.cancelarReserva(email, reservaId));
 
         // Assert
