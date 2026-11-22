@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Config;
 
+import lombok.RequiredArgsConstructor;
+
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -7,7 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.ObjectMapper;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -36,11 +38,16 @@ import java.util.Map;
 
 @Configuration
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private JwtFilter jwtFilter;
-    
+    private final JwtFilter jwtFilter;
+
+    // Orígenes autorizados para CORS. En producción se definen con la variable de
+    // entorno APP_CORS_ALLOWED_ORIGINS (lista separada por comas).
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private List<String> allowedOrigins;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,7 +60,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
 
@@ -65,8 +72,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. Desactivar CSRF (necesario para APIs REST sin sesión)
-            .csrf(csrf -> csrf.disable())
+            // 1. Desactivar CSRF intencionalmente para API REST Stateless
+            .csrf(csrf -> csrf
+                    .ignoringRequestMatchers("/api/**", "/swagger-ui/**", "/v3/api-docs/**")
+            )
 
             // 2. Habilitar CORS con la configuración de arriba
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -106,7 +115,8 @@ public class SecurityConfig {
                 // Sin token válido / no autenticado -> 401 con mensaje claro
                 .authenticationEntryPoint((request, response, authException) -> {
                 response.setStatus(401);
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("application/json;charset=UTF-8");
                 Map<String, Object> body = new HashMap<>();
                 body.put("timestamp", OffsetDateTime.now().toString());
                 body.put("mensaje", "No autenticado: debes iniciar sesion para acceder a este recurso");

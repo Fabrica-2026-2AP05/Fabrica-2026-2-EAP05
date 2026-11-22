@@ -1,5 +1,7 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import Fabrica_EAP05.Reservas.DTO.AsignarProveedorResponse;
 import Fabrica_EAP05.Reservas.Entities.ProveedorServicio;
 import Fabrica_EAP05.Reservas.Entities.Servicio;
@@ -7,23 +9,20 @@ import Fabrica_EAP05.Reservas.Entities.Usuario;
 import Fabrica_EAP05.Reservas.Repository.ProveedorServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ProveedorServicioService {
 
-    @Autowired
-    private ProveedorServicioRepository proveedorServicioRepository;
+    private final ProveedorServicioRepository proveedorServicioRepository;
 
-    @Autowired
-    private ServicioRepository servicioRepository;
+    private final ServicioRepository servicioRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     @Transactional
     public AsignarProveedorResponse asignarProveedorAServicio(UUID servicioId, UUID proveedorId) {

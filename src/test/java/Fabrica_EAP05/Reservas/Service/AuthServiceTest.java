@@ -6,6 +6,7 @@ import Fabrica_EAP05.Reservas.DTO.LoginResponseDTO;
 import Fabrica_EAP05.Reservas.Entities.Rol;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
 import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
+import Fabrica_EAP05.Reservas.Exception.CuentaBloqueadaException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,53 +67,72 @@ class AuthServiceTest {
                 () -> assertEquals(login.getEmail(), respuesta.getUsuario()),
                 () -> assertEquals(Rol.cliente, respuesta.getRol()));
         verify(inactivityTrackingService).registrarActividad(login.getEmail());
+        verify(loginAttemptService).registrarExito(login.getEmail());
+        verify(loginAttemptService, never()).registrarFallo(anyString());
     }
 
-    @Test @DisplayName("CP-01-B - Rechaza credenciales incorrectas")
+    @Test @DisplayName("CP-01-B - Rechaza credenciales incorrectas y cuenta el fallo")
     void login_credencialesIncorrectas_lanzaExcepcion() {
         // Arrange
+        when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.of(usuario));
         when(restTemplate.postForEntity(anyString(), any(), eq(String.class)))
                 .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized", null, null, null));
 
-        // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> authService.login(login));
-
-        // Assert
-        assertEquals("Credenciales inválidas", error.getMessage());
-        verify(loginAttemptService).verificarBloqueo(login.getEmail());
-        verify(loginAttemptService, never()).registrarFallo(anyString());
-        verifyNoInteractions(usuarioRepository, jwtUtil, inactivityTrackingService);
-    }
-
-    @Test @DisplayName("CP-01-E - Rechaza usuario inexistente localmente")
-    void login_usuarioNoExiste_lanzaExcepcion() {
-        // Arrange
-        when(restTemplate.postForEntity(anyString(), any(), eq(String.class))).thenReturn(ResponseEntity.ok("ok"));
-        when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.empty());
-
-        // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> authService.login(login));
-
-        // Assert
-        assertEquals("Usuario no encontrado", error.getMessage());
-        verifyNoInteractions(jwtUtil, inactivityTrackingService);
-    }
-
-    @Test @DisplayName("CP-01-F - Rechaza un usuario inactivo")
-    void login_usuarioInactivo_lanzaExcepcion() {
-        // Arrange
-        usuario.setActivo(false);
-        when(restTemplate.postForEntity(anyString(), any(), eq(String.class))).thenReturn(ResponseEntity.ok("ok"));
-        when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.of(usuario));
         // Act
         CredencialesInvalidasException error = assertThrows(CredencialesInvalidasException.class,
                 () -> authService.login(login));
 
         // Assert
-        assertEquals("El usuario se encuentra inactivo", error.getMessage());
+        assertEquals("Credenciales inválidas", error.getMessage());
+        verify(loginAttemptService).verificarBloqueo(login.getEmail());
+        verify(loginAttemptService).registrarFallo(login.getEmail());
+        verify(loginAttemptService, never()).registrarExito(anyString());
         verifyNoInteractions(jwtUtil, inactivityTrackingService);
+    }
+
+    @Test @DisplayName("CP-01-E - Rechaza usuario inexistente con mensaje genérico y cuenta el fallo")
+    void login_usuarioNoExiste_lanzaExcepcion() {
+        // Arrange
+        when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.empty());
+
+        // Act
+        CredencialesInvalidasException error = assertThrows(CredencialesInvalidasException.class,
+                () -> authService.login(login));
+
+        // Assert
+        assertEquals("Credenciales inválidas", error.getMessage());
+        verify(loginAttemptService).registrarFallo(login.getEmail());
+        verifyNoInteractions(restTemplate, jwtUtil, inactivityTrackingService);
+    }
+
+    @Test @DisplayName("CP-01-F - Rechaza un usuario inactivo con mensaje genérico y cuenta el fallo")
+    void login_usuarioInactivo_lanzaExcepcion() {
+        // Arrange
+        usuario.setActivo(false);
+        when(usuarioRepository.findByEmail(login.getEmail())).thenReturn(Optional.of(usuario));
+
+        // Act
+        CredencialesInvalidasException error = assertThrows(CredencialesInvalidasException.class,
+                () -> authService.login(login));
+
+        // Assert
+        assertEquals("Credenciales inválidas", error.getMessage());
+        verify(loginAttemptService).registrarFallo(login.getEmail());
+        verifyNoInteractions(restTemplate, jwtUtil, inactivityTrackingService);
+    }
+
+    @Test @DisplayName("CP-01-D - Rechaza el login de una cuenta bloqueada sin consultar credenciales")
+    void login_cuentaBloqueada_lanzaExcepcion() {
+        // Arrange
+        doThrow(new CuentaBloqueadaException("Cuenta bloqueada temporalmente"))
+                .when(loginAttemptService).verificarBloqueo(login.getEmail());
+
+        // Act
+        assertThrows(CuentaBloqueadaException.class, () -> authService.login(login));
+
+        // Assert
+        verify(loginAttemptService, never()).registrarFallo(anyString());
+        verifyNoInteractions(usuarioRepository, restTemplate, jwtUtil, inactivityTrackingService);
     }
 
     @Test @DisplayName("CP-03-A y CP-03-C - Cierra sesión y revoca el token")

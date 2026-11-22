@@ -1,9 +1,10 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 
 // Usa el Admin API de Supabase (requiere la service_role key, nunca la anon
@@ -22,10 +24,10 @@ import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
 // hacia auth.users, así que cualquier id insertado ahí debe existir primero
 // en Supabase Auth.
 @Service
+@RequiredArgsConstructor
 public class SupabaseAuthService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -131,16 +133,19 @@ public class SupabaseAuthService {
 
         Map<String, Object> responseBody = response.getBody();
         if (responseBody == null) {
-            throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException(
+                "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
         }
 
         Object accessToken = responseBody.get("access_token");
         if (accessToken == null) {
-            throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+            throw new CredencialesInvalidasException(
+                "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
         }
         return accessToken.toString();
     } catch (HttpClientErrorException e) {
-        throw new IllegalArgumentException("Token de recuperación inválido o expirado");
+        throw new CredencialesInvalidasException(
+            "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde 'Olvidé mi contraseña");
     }
     }
 

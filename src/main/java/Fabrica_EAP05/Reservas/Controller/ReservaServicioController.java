@@ -1,19 +1,20 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
+import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
+import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import Fabrica_EAP05.Reservas.DTO.CrearReservaRequest;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaResponse;
@@ -23,14 +24,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import org.springframework.format.annotation.DateTimeFormat;
+import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 
 @RestController
 @RequestMapping("/api/reservas")
 @Tag(name = "Reservas", description = "Reservas de servicios")
+@RequiredArgsConstructor
 public class ReservaServicioController {
 
-    @Autowired
-    private ReservaServicioService reservaServicioService;
+    private final ReservaServicioService reservaServicioService;
 
     @Operation(summary = "Crear reserva",
             description = "Reserva un servicio en un horario disponible para el cliente autenticado. "
@@ -69,10 +73,129 @@ public class ReservaServicioController {
                                             @AuthenticationPrincipal String email) {
         try {
             return ResponseEntity.ok(reservaServicioService.cancelarReserva(email, id));
+        } catch (NoSuchElementException e) {
+            // Reserva inexistente o de otro cliente: mismo 404 para no revelar cuál de las dos
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("mensaje", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar historial de reservas",
+            description = "Retorna el historial de reservas realizadas por el cliente autenticado junto con su estado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente)")
+    })
+    @org.springframework.web.bind.annotation.GetMapping("/historial")
+    @PreAuthorize("hasRole('cliente')")
+    public ResponseEntity<?> consultarHistorial(@AuthenticationPrincipal String email) {
+        try {
+            java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> historial =
+                    reservaServicioService.consultarHistorialCliente(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar historial de reservas como proveedor",
+            description = "Retorna el historial de reservas asociadas a los servicios/horarios del proveedor autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol proveedor)")
+    })
+    @GetMapping("/historial-proveedor")
+    @PreAuthorize("hasAnyRole('proveedor', 'PROVEEDOR')")
+    public ResponseEntity<?> consultarHistorialProveedor(@AuthenticationPrincipal String email) {
+        try {
+            List<HistorialProveedorResponse> historial =
+                    reservaServicioService.consultarHistorialProveedor(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar historial global del negocio",
+            description = "Retorna todas las reservas de servicios y eventos del negocio con su estado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/historial-negocio")
+    @PreAuthorize("hasAnyRole('administrador', 'ADMIN')")
+    public ResponseEntity<?> consultarHistorialNegocio(@AuthenticationPrincipal String email) {
+        try {
+            List<HistorialNegocioResponse> historial =
+                    reservaServicioService.consultarHistorialNegocio(email);
+
+            if (historial.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen reservas registradas para el negocio",
+                        "reservas", historial
+                ));
+            }
+
+            return ResponseEntity.ok(historial);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Consultar ocupación de servicios",
+            description = "Calcula el porcentaje de horarios reservados respecto al total de horarios ofertados por cada servicio en un periodo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reporte de ocupación generado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Parámetros de fecha inválidos"),
+            @ApiResponse(responseCode = "401", description = "Sin autenticación"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol administrador)")
+    })
+    @GetMapping("/ocupacion-servicios")
+    @PreAuthorize("hasAnyRole('administrador', 'ADMIN')")
+    public ResponseEntity<?> consultarOcupacionServicios(
+            @AuthenticationPrincipal String email,
+            @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam("hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
+        try {
+            List<OcupacionServicioResponse> ocupacion =
+                    reservaServicioService.consultarOcupacionServicios(email, desde, hasta);
+
+            if (ocupacion.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "No existen datos de ocupación para el periodo consultado",
+                        "servicios", ocupacion
+                ));
+            }
+
+            return ResponseEntity.ok(ocupacion);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("mensaje", e.getMessage()));
         }
     }
 }

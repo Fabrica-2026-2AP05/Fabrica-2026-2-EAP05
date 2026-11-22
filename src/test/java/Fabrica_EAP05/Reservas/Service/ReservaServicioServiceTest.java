@@ -9,6 +9,8 @@ import Fabrica_EAP05.Reservas.Entities.Recurso;
 import Fabrica_EAP05.Reservas.Entities.ReservaServicio;
 import Fabrica_EAP05.Reservas.Entities.Servicio;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
+import Fabrica_EAP05.Reservas.Entities.Evento;
+import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
 import Fabrica_EAP05.Reservas.Enums.EstadoHorario;
 import Fabrica_EAP05.Reservas.Enums.EstadoReserva;
 import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
@@ -17,6 +19,9 @@ import Fabrica_EAP05.Reservas.Repository.HorarioRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.ServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
+import Fabrica_EAP05.Reservas.Repository.RecursoRepository;
+import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
+import Fabrica_EAP05.Reservas.Repository.EventoRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,6 +49,9 @@ class ReservaServicioServiceTest {
     @Mock private HorarioRepository horarioRepository;
     @Mock private ReservaServicioRepository reservaRepository;
     @Mock private DisponibilidadRecursoRepository disponibilidadRepository;
+    @Mock private RecursoRepository recursoRepository;
+    @Mock private ReservaEventoRepository reservaEventoRepository;
+    @Mock private EventoRepository eventoRepository;
     @Mock private EntityManager entityManager;
     @InjectMocks private ReservaServicioService reservaService;
 
@@ -115,6 +124,84 @@ class ReservaServicioServiceTest {
         // Assert
         assertEquals("El servicio es obligatorio", error.getMessage());
         verifyNoInteractions(usuarioRepository);
+    }
+
+    @Test @DisplayName("Rechaza una solicitud sin horario")
+    void crearReserva_sinHorario_lanzaExcepcion() {
+        request.setHorarioId(null);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> reservaService.crearReserva(email, request));
+
+        assertEquals("El horario es obligatorio", error.getMessage());
+        verifyNoInteractions(usuarioRepository, servicioRepository, horarioRepository);
+    }
+
+    @Test @DisplayName("Rechaza crear una reserva para un usuario inexistente")
+    void crearReserva_usuarioInexistente_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.crearReserva(email, request));
+
+        verifyNoInteractions(servicioRepository, horarioRepository);
+    }
+
+    @Test @DisplayName("Rechaza crear una reserva para un servicio inactivo")
+    void crearReserva_servicioInactivo_lanzaExcepcion() {
+        servicio.setActivo(false);
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+
+        assertThrows(UsuarioInactivoException.class,
+                () -> reservaService.crearReserva(email, request));
+
+        verifyNoInteractions(horarioRepository);
+    }
+
+    @Test @DisplayName("Rechaza crear una reserva para un horario inexistente")
+    void crearReserva_horarioInexistente_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findByIdParaActualizar(horario.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.crearReserva(email, request));
+    }
+
+    @Test @DisplayName("Rechaza un recurso ocupado aunque su periodo tenga cobertura")
+    void crearReserva_recursoOcupado_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findByIdParaActualizar(horario.getId())).thenReturn(Optional.of(horario));
+        when(disponibilidadRepository.findByRecursoIdAndInicioLessThanEqualAndFinGreaterThanEqual(
+                recurso.getId(), horario.getInicio(), horario.getFin()))
+                .thenReturn(List.of(new DisponibilidadRecurso()));
+        when(reservaRepository.contarReservasDeRecursoEnRango(
+                recurso.getId(), horario.getInicio(), horario.getFin())).thenReturn(1L);
+
+        assertThrows(IllegalStateException.class,
+                () -> reservaService.crearReserva(email, request));
+
+        verify(reservaRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Informa un error si la reserva guardada no puede recargarse")
+    void crearReserva_reservaNoRecuperable_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findByIdParaActualizar(horario.getId())).thenReturn(Optional.of(horario));
+        when(disponibilidadRepository.findByRecursoIdAndInicioLessThanEqualAndFinGreaterThanEqual(
+                recurso.getId(), horario.getInicio(), horario.getFin()))
+                .thenReturn(List.of(new DisponibilidadRecurso()));
+        when(reservaRepository.contarReservasDeRecursoEnRango(any(), any(), any())).thenReturn(0L);
+        when(reservaRepository.saveAndFlush(any(ReservaServicio.class))).thenAnswer(i -> i.getArgument(0));
+        when(reservaRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class,
+                () -> reservaService.crearReserva(email, request));
+
+        verify(entityManager).detach(any(ReservaServicio.class));
     }
 
     @Test @DisplayName("Rechaza un cliente inactivo")
@@ -228,7 +315,23 @@ class ReservaServicioServiceTest {
         when(reservaRepository.findByIdParaActualizar(reservaId)).thenReturn(Optional.of(reserva));
 
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+        NoSuchElementException error = assertThrows(NoSuchElementException.class,
+                () -> reservaService.cancelarReserva(email, reservaId));
+
+        // Assert
+        assertEquals("La reserva no existe", error.getMessage());
+        assertEquals(EstadoReserva.confirmada, reserva.getEstado());
+        verify(reservaRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Rechaza cancelar una reserva inexistente con el mismo mensaje")
+    void cancelarReserva_reservaInexistente_lanzaExcepcion() {
+        // Arrange
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(reservaRepository.findByIdParaActualizar(reservaId)).thenReturn(Optional.empty());
+
+        // Act
+        NoSuchElementException error = assertThrows(NoSuchElementException.class,
                 () -> reservaService.cancelarReserva(email, reservaId));
 
         // Assert
@@ -250,6 +353,184 @@ class ReservaServicioServiceTest {
         // Assert
         assertTrue(error.getMessage().contains("no está confirmada"));
         verify(reservaRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Rechaza cancelar cuando el usuario autenticado no existe")
+    void cancelarReserva_usuarioInexistente_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.cancelarReserva(email, reservaId));
+
+        verifyNoInteractions(reservaRepository);
+    }
+
+    @Test @DisplayName("Rechaza cancelar cuando el cliente está inactivo")
+    void cancelarReserva_clienteInactivo_lanzaExcepcion() {
+        cliente.setActivo(false);
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+
+        assertThrows(UsuarioInactivoException.class,
+                () -> reservaService.cancelarReserva(email, reservaId));
+
+        verifyNoInteractions(reservaRepository);
+    }
+
+    @Test @DisplayName("Consulta horarios disponibles de un servicio sin recurso")
+    void consultarDisponibilidad_servicioSinRecurso_retornaHorarios() {
+        servicio.setRecurso(null);
+        horario.setProveedorId(UUID.randomUUID());
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findDisponiblesPorServicio(eq(servicio.getId()), any(LocalDateTime.class)))
+                .thenReturn(List.of(horario));
+
+        var resultado = reservaService.consultarDisponibilidad(servicio.getId());
+
+        assertAll(() -> assertEquals(1, resultado.size()),
+                () -> assertEquals(horario.getId(), resultado.get(0).getId()));
+    }
+
+    @Test @DisplayName("Rechaza disponibilidad de un servicio inexistente o inactivo")
+    void consultarDisponibilidad_servicioInvalido_lanzaExcepcion() {
+        UUID inexistente = UUID.randomUUID();
+        when(servicioRepository.findById(inexistente)).thenReturn(Optional.empty());
+        assertThrows(NoSuchElementException.class,
+                () -> reservaService.consultarDisponibilidad(inexistente));
+
+        servicio.setActivo(false);
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        assertThrows(IllegalStateException.class,
+                () -> reservaService.consultarDisponibilidad(servicio.getId()));
+    }
+
+    @Test @DisplayName("Filtra horarios cuyo recurso está ocupado")
+    void consultarDisponibilidad_recursoOcupado_filtraHorario() {
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findDisponiblesPorServicio(eq(servicio.getId()), any(LocalDateTime.class)))
+                .thenReturn(List.of(horario));
+        when(disponibilidadRepository.findByRecursoIdAndInicioLessThanEqualAndFinGreaterThanEqual(
+                recurso.getId(), horario.getInicio(), horario.getFin()))
+                .thenReturn(List.of(new DisponibilidadRecurso()));
+        when(reservaRepository.contarReservasDeRecursoEnRango(
+                recurso.getId(), horario.getInicio(), horario.getFin())).thenReturn(1L);
+
+        assertTrue(reservaService.consultarDisponibilidad(servicio.getId()).isEmpty());
+    }
+
+    @Test @DisplayName("Construye el historial completo del cliente")
+    void consultarHistorialCliente_conReserva_retornaDetalle() {
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        when(reservaRepository.findByClienteIdOrderByCreadaEnDesc(cliente.getId())).thenReturn(List.of(reserva));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(horarioRepository.findById(horario.getId())).thenReturn(Optional.of(horario));
+        when(recursoRepository.findById(recurso.getId())).thenReturn(Optional.of(recurso));
+
+        var resultado = reservaService.consultarHistorialCliente(email);
+
+        assertAll(() -> assertEquals(1, resultado.size()),
+                () -> assertEquals("Masaje", resultado.get(0).getNombreServicio()),
+                () -> assertEquals("Sala 1", resultado.get(0).getNombreRecurso()));
+    }
+
+    @Test @DisplayName("Rechaza el historial de un cliente inexistente o inactivo")
+    void consultarHistorialCliente_usuarioInvalido_lanzaExcepcion() {
+        when(usuarioRepository.findByEmail("nadie@test.com")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.consultarHistorialCliente("nadie@test.com"));
+
+        cliente.setActivo(false);
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        assertThrows(UsuarioInactivoException.class,
+                () -> reservaService.consultarHistorialCliente(email));
+    }
+
+    @Test @DisplayName("Construye el historial del proveedor con datos relacionados")
+    void consultarHistorialProveedor_conReserva_retornaDetalle() {
+        Usuario proveedor = new Usuario();
+        proveedor.setId(UUID.randomUUID());
+        proveedor.setActivo(true);
+        cliente.setNombre("Cliente Uno");
+        when(usuarioRepository.findByEmail("proveedor@test.com")).thenReturn(Optional.of(proveedor));
+        when(reservaRepository.findHistorialByProveedorId(proveedor.getId())).thenReturn(List.of(reserva));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+        when(horarioRepository.findById(horario.getId())).thenReturn(Optional.of(horario));
+        when(recursoRepository.findById(recurso.getId())).thenReturn(Optional.of(recurso));
+
+        var resultado = reservaService.consultarHistorialProveedor("proveedor@test.com");
+
+        assertAll(() -> assertEquals(1, resultado.size()),
+                () -> assertEquals("Cliente Uno", resultado.get(0).getNombreCliente()),
+                () -> assertEquals("Masaje", resultado.get(0).getNombreServicio()));
+    }
+
+    @Test @DisplayName("Une reservas de servicios y eventos en el historial del negocio")
+    void consultarHistorialNegocio_conServicioYEvento_retornaAmbos() {
+        Usuario admin = new Usuario();
+        admin.setActivo(true);
+        Evento evento = new Evento();
+        evento.setId(UUID.randomUUID());
+        evento.setNombre("Taller");
+        evento.setInicio(LocalDateTime.of(2026, 11, 2, 8, 0));
+        evento.setFin(LocalDateTime.of(2026, 11, 2, 10, 0));
+        ReservaEvento reservaEvento = new ReservaEvento();
+        reservaEvento.setId(UUID.randomUUID());
+        reservaEvento.setEventoId(evento.getId());
+        reservaEvento.setClienteId(cliente.getId());
+        reservaEvento.setEstado(EstadoReserva.confirmada);
+        when(usuarioRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(admin));
+        when(reservaRepository.findAll()).thenReturn(List.of(reserva));
+        when(reservaEventoRepository.findAll()).thenReturn(List.of(reservaEvento));
+        when(servicioRepository.findById(servicio.getId())).thenReturn(Optional.of(servicio));
+        when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+        when(horarioRepository.findById(horario.getId())).thenReturn(Optional.of(horario));
+        when(recursoRepository.findById(recurso.getId())).thenReturn(Optional.of(recurso));
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+
+        var resultado = reservaService.consultarHistorialNegocio("admin@test.com");
+
+        assertAll(() -> assertEquals(2, resultado.size()),
+                () -> assertTrue(resultado.stream().anyMatch(r -> "SERVICIO".equals(r.getTipo()))),
+                () -> assertTrue(resultado.stream().anyMatch(r -> "EVENTO".equals(r.getTipo()))));
+    }
+
+    @Test @DisplayName("Calcula ocupación y omite servicios sin actividad")
+    void consultarOcupacionServicios_conActividad_calculaPorcentaje() {
+        Usuario admin = new Usuario();
+        admin.setActivo(true);
+        Servicio sinActividad = new Servicio(UUID.randomUUID(), "Vacío", "", 30, null, true);
+        LocalDateTime desde = LocalDateTime.of(2026, 11, 1, 0, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 12, 1, 0, 0);
+        when(usuarioRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(admin));
+        when(servicioRepository.findAll()).thenReturn(List.of(servicio, sinActividad));
+        when(horarioRepository.contarHorariosOfertadosPorServicioEnPeriodo(
+                servicio.getId(), EstadoHorario.bloqueado, desde, hasta)).thenReturn(4L);
+        when(reservaRepository.contarReservasConfirmadasPorServicioEnPeriodo(
+                servicio.getId(), EstadoReserva.confirmada, desde, hasta)).thenReturn(3L);
+
+        var resultado = reservaService.consultarOcupacionServicios("admin@test.com", desde, hasta);
+
+        assertAll(() -> assertEquals(1, resultado.size()),
+                () -> assertEquals(75.0, resultado.get(0).getPorcentajeOcupacion()));
+    }
+
+    @Test @DisplayName("Valida fechas y administrador en el reporte de ocupación")
+    void consultarOcupacionServicios_parametrosInvalidos_lanzaExcepcion() {
+        LocalDateTime desde = LocalDateTime.of(2026, 11, 1, 0, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 12, 1, 0, 0);
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.consultarOcupacionServicios(email, null, hasta));
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.consultarOcupacionServicios(email, hasta, desde));
+
+        when(usuarioRepository.findByEmail("admin@test.com")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class,
+                () -> reservaService.consultarOcupacionServicios("admin@test.com", desde, hasta));
+
+        cliente.setActivo(false);
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(cliente));
+        assertThrows(UsuarioInactivoException.class,
+                () -> reservaService.consultarOcupacionServicios(email, desde, hasta));
     }
 
     private void prepararCreacionValida() {

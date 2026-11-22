@@ -1,11 +1,13 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.access.AccessDeniedException;
 import java.util.List;
 import java.util.UUID;
 
 import Fabrica_EAP05.Reservas.Enums.EstadoReserva;
 import Fabrica_EAP05.Reservas.Repository.ReservaServicioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import Fabrica_EAP05.Reservas.DTO.HorarioRequest;
@@ -18,19 +20,16 @@ import Fabrica_EAP05.Reservas.Repository.ProveedorServicioRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
+@RequiredArgsConstructor
 public class HorarioService {
 
-    @Autowired
-    private HorarioRepository horarioRepository;
+    private final HorarioRepository horarioRepository;
 
-    @Autowired
-    private ProveedorServicioRepository proveedorServicioRepository;
+    private final ProveedorServicioRepository proveedorServicioRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private ReservaServicioRepository reservaServicioRepository;
+    private final ReservaServicioRepository reservaServicioRepository;
 
     public Horario registrarHorario(HorarioRequest request) {
 
@@ -51,7 +50,7 @@ public class HorarioService {
         // 3. Criterio de Aceptación: Validar que el proveedor esté asociado a al menos un servicio
         boolean asociado = proveedorServicioRepository.existsByProveedorId(request.getProveedorId());
         if (!asociado) {
-            throw new IllegalArgumentException("El proveedor debe estar asociado a al menos un servicio para registrar un horario.");
+            throw new AccessDeniedException("El proveedor debe estar asociado a al menos un servicio para registrar un horario.");
         }
 
         // 4. Criterio de Aceptación: Validar solapamientos

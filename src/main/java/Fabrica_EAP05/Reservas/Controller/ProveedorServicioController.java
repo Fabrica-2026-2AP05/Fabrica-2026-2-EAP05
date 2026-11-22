@@ -1,9 +1,10 @@
 package Fabrica_EAP05.Reservas.Controller;
 
+import lombok.RequiredArgsConstructor;
+
 import Fabrica_EAP05.Reservas.DTO.AsignarProveedorRequest;
 import Fabrica_EAP05.Reservas.DTO.AsignarProveedorResponse;
 import Fabrica_EAP05.Reservas.Service.ProveedorServicioService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,10 +12,10 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/proveedor-servicio")
+@RequiredArgsConstructor
 public class ProveedorServicioController {
 
-    @Autowired
-    private ProveedorServicioService proveedorServicioService;
+    private final ProveedorServicioService proveedorServicioService;
 
     @PostMapping("/asignar")
     @PreAuthorize("hasAnyRole('administrador', 'ADMIN')")

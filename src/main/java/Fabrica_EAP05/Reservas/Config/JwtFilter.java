@@ -1,11 +1,12 @@
 package Fabrica_EAP05.Reservas.Config;
 
+import lombok.RequiredArgsConstructor;
+
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,19 +22,16 @@ import java.io.IOException;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private InactivityTrackingService inactivityTrackingService;
+    private final InactivityTrackingService inactivityTrackingService;
 
-    @Autowired
-    private TokenBlacklistService tokenBlacklistService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -50,6 +48,8 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = authHeader.replace("Bearer ", "");
 
             if (tokenBlacklistService.estaEnLista(token)) {
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("text/plain;charset=UTF-8");
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Sesión expirada. Por favor, inicie sesión nuevamente");
                 return;
@@ -72,6 +72,8 @@ public class JwtFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     } else {
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setCharacterEncoding("UTF-8");
+                        response.setContentType("text/plain;charset=UTF-8");
                         response.getWriter().write("Sesión expirada por inactividad");
                         return;
                     }

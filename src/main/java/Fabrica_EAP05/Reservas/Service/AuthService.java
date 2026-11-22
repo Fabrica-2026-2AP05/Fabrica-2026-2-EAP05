@@ -1,8 +1,9 @@
 package Fabrica_EAP05.Reservas.Service;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,31 +21,24 @@ import Fabrica_EAP05.Reservas.Exception.CredencialesInvalidasException;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private InactivityTrackingService inactivityTrackingService;
+    private final InactivityTrackingService inactivityTrackingService;
 
-    @Autowired
-    private TokenBlacklistService tokenBlacklistService;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
-    @Autowired
-    private SupabaseAuthService supabaseAuthService;
+    private final SupabaseAuthService supabaseAuthService;
 
-     @Autowired
-    private MailService mailService;
+     private final MailService mailService;
 
-    @Autowired
-    private LoginAttemptService loginAttemptService;
+    private final LoginAttemptService loginAttemptService;
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -57,10 +51,19 @@ public class AuthService {
 
     public LoginResponseDTO login(LoginDTO dto) {
 
-        // 0. Verificar si el usuario está bloqueado ANTES de gastar una llamada a Supabase
+        // 0. Verificar si el usuario está bloqueado
         loginAttemptService.verificarBloqueo(dto.getEmail());
 
-        // 1. Validar credenciales contra Supabase Auth
+        // 1. Buscar perfil local primero y validar si está activo.
+        //    Email inexistente o usuario inactivo cuentan como intento fallido y
+        //    responden el mismo mensaje, para no revelar si el email existe.
+        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail()).orElse(null);
+        if (usuario == null || Boolean.FALSE.equals(usuario.getActivo())) {
+            loginAttemptService.registrarFallo(dto.getEmail());
+            throw new CredencialesInvalidasException("Credenciales inválidas");
+        }
+
+        // 2. Validar credenciales contra Supabase Auth
         try {
             validarCredencialesSupabase(dto.getEmail(), dto.getContrasena());
         } catch (CredencialesInvalidasException e) {
@@ -71,21 +74,13 @@ public class AuthService {
         // Login exitoso: resetear contador
         loginAttemptService.registrarExito(dto.getEmail());
 
-        // 2. Buscar perfil local por email
-        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-        // 3. Verificar estado del usuario en tu base de datos
-        if (Boolean.FALSE.equals(usuario.getActivo())) {
-            throw new CredencialesInvalidasException("El usuario se encuentra inactivo");
-        }
-
-        // 4. Generar token y registrar actividad
+        // 3. Generar token y registrar actividad
         String token = jwtUtil.generarToken(usuario.getEmail(), usuario.getRol());
         inactivityTrackingService.registrarActividad(usuario.getEmail());
 
         return new LoginResponseDTO(token, usuario.getEmail(), usuario.getRol());
     }
+
 
     private void validarCredencialesSupabase(String email, String password) {
         HttpHeaders headers = new HttpHeaders();
@@ -106,7 +101,7 @@ public class AuthService {
                     String.class
             );
         } catch (HttpClientErrorException e) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+            throw new CredencialesInvalidasException("Credenciales inválidas");
         }
     }
 
