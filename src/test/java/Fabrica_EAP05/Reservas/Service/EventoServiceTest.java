@@ -3,6 +3,9 @@ package Fabrica_EAP05.Reservas.Service;
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.OcupacionEventoResponse;
 import Fabrica_EAP05.Reservas.DTO.ReservaEventoResponse;
+import Fabrica_EAP05.Reservas.DTO.RegistrarEventoRequest;
+import Fabrica_EAP05.Reservas.DTO.ModificarEventoRequest;
+import Fabrica_EAP05.Reservas.DTO.RegistroEventoResponse;
 import Fabrica_EAP05.Reservas.Entities.Evento;
 import Fabrica_EAP05.Reservas.Entities.ReservaEvento;
 import Fabrica_EAP05.Reservas.Entities.Usuario;
@@ -12,6 +15,8 @@ import Fabrica_EAP05.Reservas.Exception.CupoAgotadoException;
 import Fabrica_EAP05.Reservas.Exception.EventoNoEncontradoException;
 import Fabrica_EAP05.Reservas.Exception.PlazoCancelacionException;
 import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
+import Fabrica_EAP05.Reservas.Exception.RecursoDuplicadoException;
+import Fabrica_EAP05.Reservas.Exception.CapacidadInsuficienteException;
 import Fabrica_EAP05.Reservas.Repository.EventoRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
@@ -30,6 +35,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -63,6 +69,138 @@ class EventoServiceTest {
         evento.setNombre("Taller");
         evento.setCapacidad(10);
         evento.setActivo(true);
+    }
+
+    private RegistrarEventoRequest solicitudRegistro() {
+        RegistrarEventoRequest request = new RegistrarEventoRequest();
+        request.setNombre("Taller");
+        request.setDescripcion("Taller práctico");
+        request.setInicio(OffsetDateTime.parse("2026-12-10T09:00:00-05:00"));
+        request.setFin(OffsetDateTime.parse("2026-12-10T11:00:00-05:00"));
+        request.setCapacidad(20);
+        return request;
+    }
+
+    @Test @DisplayName("Registra un evento nuevo con todos sus datos")
+    void registrarEvento_datosValidos_guardaYRetornaEvento() {
+        RegistrarEventoRequest request = solicitudRegistro();
+        when(eventoRepository.existsByNombre("Taller")).thenReturn(false);
+        when(eventoRepository.saveAndFlush(any(Evento.class))).thenAnswer(i -> i.getArgument(0));
+
+        RegistroEventoResponse resultado = eventoService.registrarEvento(request);
+
+        assertAll(
+                () -> assertNotNull(resultado.getId()),
+                () -> assertEquals("Taller", resultado.getNombre()),
+                () -> assertEquals("Taller práctico", resultado.getDescripcion()),
+                () -> assertEquals(20, resultado.getCapacidad()),
+                () -> assertTrue(resultado.getActivo()),
+                () -> assertEquals(request.getInicio().toInstant(), resultado.getInicio().toInstant()),
+                () -> assertEquals(request.getFin().toInstant(), resultado.getFin().toInstant())
+        );
+        verify(eventoRepository).saveAndFlush(any(Evento.class));
+    }
+
+    @Test @DisplayName("Rechaza registrar un evento con nombre duplicado")
+    void registrarEvento_nombreDuplicado_lanzaExcepcion() {
+        RegistrarEventoRequest request = solicitudRegistro();
+        when(eventoRepository.existsByNombre("Taller")).thenReturn(true);
+
+        assertThrows(RecursoDuplicadoException.class,
+                () -> eventoService.registrarEvento(request));
+
+        verify(eventoRepository, never()).saveAndFlush(any());
+    }
+
+    private ModificarEventoRequest solicitudModificacion(String nombre) {
+        ModificarEventoRequest request = new ModificarEventoRequest();
+        request.setNombre(nombre);
+        request.setDescripcion("Descripción actualizada");
+        request.setInicio(OffsetDateTime.parse("2026-12-11T09:00:00-05:00"));
+        request.setFin(OffsetDateTime.parse("2026-12-11T12:00:00-05:00"));
+        return request;
+    }
+
+    @Test @DisplayName("Actualiza un evento existente")
+    void actualizarEvento_datosValidos_actualizaCampos() {
+        ModificarEventoRequest request = solicitudModificacion("Taller renovado");
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+        when(eventoRepository.existsByNombreAndIdNot(request.getNombre(), evento.getId())).thenReturn(false);
+        when(eventoRepository.saveAndFlush(evento)).thenReturn(evento);
+
+        RegistroEventoResponse resultado = eventoService.actualizarEvento(evento.getId(), request);
+
+        assertAll(
+                () -> assertEquals("Taller renovado", resultado.getNombre()),
+                () -> assertEquals("Descripción actualizada", resultado.getDescripcion()),
+                () -> assertEquals(request.getInicio().toInstant(), resultado.getInicio().toInstant())
+        );
+    }
+
+    @Test @DisplayName("Rechaza actualizar un evento inexistente")
+    void actualizarEvento_inexistente_lanzaExcepcion() {
+        UUID id = UUID.randomUUID();
+        when(eventoRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(EventoNoEncontradoException.class,
+                () -> eventoService.actualizarEvento(id, solicitudModificacion("Nuevo")));
+    }
+
+    @Test @DisplayName("Rechaza cambiar el nombre por uno utilizado en otro evento")
+    void actualizarEvento_nombreDuplicado_lanzaExcepcion() {
+        ModificarEventoRequest request = solicitudModificacion("Evento existente");
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+        when(eventoRepository.existsByNombreAndIdNot(request.getNombre(), evento.getId())).thenReturn(true);
+
+        assertThrows(RecursoDuplicadoException.class,
+                () -> eventoService.actualizarEvento(evento.getId(), request));
+
+        verify(eventoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Permite conservar el mismo nombre sin buscar duplicados")
+    void actualizarEvento_mismoNombre_noConsultaDuplicados() {
+        ModificarEventoRequest request = solicitudModificacion("Taller");
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+        when(eventoRepository.saveAndFlush(evento)).thenReturn(evento);
+
+        eventoService.actualizarEvento(evento.getId(), request);
+
+        verify(eventoRepository, never()).existsByNombreAndIdNot(anyString(), any());
+    }
+
+    @Test @DisplayName("Define una capacidad válida para el evento")
+    void definirCapacidad_valida_actualizaEvento() {
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+        when(reservaEventoRepository.countByEventoIdAndEstado(evento.getId(), EstadoReserva.confirmada))
+                .thenReturn(3L);
+        when(eventoRepository.saveAndFlush(evento)).thenReturn(evento);
+
+        RegistroEventoResponse resultado = eventoService.definirCapacidad(evento.getId(), 5);
+
+        assertEquals(5, resultado.getCapacidad());
+    }
+
+    @Test @DisplayName("Rechaza una capacidad menor a las reservas confirmadas")
+    void definirCapacidad_inferiorAConfirmadas_lanzaExcepcion() {
+        when(eventoRepository.findById(evento.getId())).thenReturn(Optional.of(evento));
+        when(reservaEventoRepository.countByEventoIdAndEstado(evento.getId(), EstadoReserva.confirmada))
+                .thenReturn(6L);
+
+        CapacidadInsuficienteException error = assertThrows(CapacidadInsuficienteException.class,
+                () -> eventoService.definirCapacidad(evento.getId(), 5));
+
+        assertTrue(error.getMessage().contains("6"));
+        verify(eventoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test @DisplayName("Rechaza definir capacidad de un evento inexistente")
+    void definirCapacidad_eventoInexistente_lanzaExcepcion() {
+        UUID id = UUID.randomUUID();
+        when(eventoRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(EventoNoEncontradoException.class,
+                () -> eventoService.definirCapacidad(id, 10));
     }
 
     @Test @DisplayName("Escenario 1 - Reserva confirmada y los cupos disminuyen en uno")
