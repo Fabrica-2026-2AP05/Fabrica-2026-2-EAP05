@@ -33,6 +33,7 @@ import Fabrica_EAP05.Reservas.Exception.UsuarioInactivoException;
 import Fabrica_EAP05.Reservas.Repository.EventoRepository;
 import Fabrica_EAP05.Reservas.Repository.ReservaEventoRepository;
 import Fabrica_EAP05.Reservas.Repository.UsuarioRepository;
+import jakarta.persistence.EntityManager;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class EventoService {
     private final ReservaEventoRepository reservaEventoRepository;
     private final EventoRepository eventoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final EntityManager entityManager;
 
     // HU22: horas mínimas de anticipación para cancelar una reserva de evento
     static final long HORAS_MINIMAS_CANCELACION = 12;
@@ -225,9 +227,11 @@ public class EventoService {
                     + HORAS_MINIMAS_CANCELACION + " horas para el inicio del evento");
         }
 
-        // e. Cancelar; el cupo se libera porque solo cuentan las reservas confirmadas
+        // e. Cancelar; el cupo se libera porque solo cuentan las reservas confirmadas.
+        //    cancelada_en lo asigna la base; refresh lo lee (mismo patrón que ReservaServicioService)
         reserva.setEstado(EstadoReserva.cancelada);
         ReservaEvento guardada = reservaEventoRepository.saveAndFlush(reserva);
+        entityManager.refresh(guardada);
 
         return new CancelarReservaEventoResponse(
                 guardada.getId(),

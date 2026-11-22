@@ -1,5 +1,6 @@
 package Fabrica_EAP05.Reservas.Entities;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -31,6 +32,13 @@ public class ReservaEvento {
     @Column(name = "estado", columnDefinition = "estado_reserva")
     private EstadoReserva estado = EstadoReserva.confirmada;
 
+    // Lo asigna la base (DEFAULT now()); Java no lo inserta ni lo actualiza
+    @Column(name = "creada_en", insertable = false, updatable = false)
+    private LocalDateTime creadaEn;
+
+    @Column(name = "cancelada_en")
+    private LocalDateTime canceladaEn;
+
     public UUID getId() {
         return id;
     }
@@ -61,5 +69,22 @@ public class ReservaEvento {
 
     public void setEstado(EstadoReserva estado) {
         this.estado = estado;
+    }
+
+    public LocalDateTime getCreadaEn() {
+        return creadaEn;
+    }
+
+    // Solo tiene efecto en memoria (tests); la columna no es insertable ni actualizable
+    public void setCreadaEn(LocalDateTime creadaEn) {
+        this.creadaEn = creadaEn;
+    }
+
+    public LocalDateTime getCanceladaEn() {
+        return canceladaEn;
+    }
+
+    public void setCanceladaEn(LocalDateTime canceladaEn) {
+        this.canceladaEn = canceladaEn;
     }
 }

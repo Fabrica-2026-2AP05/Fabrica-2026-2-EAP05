@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    container_name: reservas-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    networks:
+      - monitoreo-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: reservas-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - app
+    networks:
+      - monitoreo-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: reservas-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    depends_on:
+      - prometheus
+    networks:
+      - monitoreo-net
+
+networks:
+  monitoreo-net:
+    driver: bridge

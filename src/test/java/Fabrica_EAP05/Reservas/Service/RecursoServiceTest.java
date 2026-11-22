@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -45,6 +46,9 @@ class RecursoServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(recursoService, "recursoRepository", recursoRepository);
+        ReflectionTestUtils.setField(recursoService, "reservaServicioRepository", reservaRepository);
+        ReflectionTestUtils.setField(recursoService, "disponibilidadRecursoRepository", disponibilidadRepository);
         recursoId = UUID.randomUUID();
         recurso = new Recurso();
         recurso.setId(recursoId);
@@ -56,6 +60,19 @@ class RecursoServiceTest {
         request.setDescripcion("Sala principal");
         inicio = OffsetDateTime.parse("2026-11-01T08:00:00-05:00");
         fin = OffsetDateTime.parse("2026-11-01T12:00:00-05:00");
+    }
+
+    @Test @DisplayName("Informa un error si el recurso guardado no puede recuperarse")
+    void registrarRecurso_recursoNoRecuperable_lanzaExcepcion() {
+        when(recursoRepository.existsByNombre(request.getNombre())).thenReturn(false);
+        when(recursoRepository.saveAndFlush(any(Recurso.class))).thenAnswer(i -> i.getArgument(0));
+        when(recursoRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> recursoService.registrarRecurso(request));
+
+        assertTrue(error.getMessage().contains("No se pudo recuperar"));
+        verify(entityManager).detach(any(Recurso.class));
     }
 
     @Test @DisplayName("Registra un recurso nuevo")
@@ -114,6 +131,18 @@ class RecursoServiceTest {
 
         // Assert
         assertTrue(resultado.getActivo());
+        verifyNoInteractions(reservaRepository);
+        verify(recursoRepository).save(recurso);
+    }
+
+    @Test @DisplayName("Mantiene inactivo un recurso sin consultar reservas")
+    void cambiarDisponibilidad_recursoYaInactivo_noConsultaReservas() {
+        recurso.setActivo(false);
+        when(recursoRepository.findByIdParaActualizar(recursoId)).thenReturn(Optional.of(recurso));
+
+        RecursoDisponibilidadResponse resultado = recursoService.cambiarDisponibilidad(recursoId, false);
+
+        assertFalse(resultado.getActivo());
         verifyNoInteractions(reservaRepository);
         verify(recursoRepository).save(recurso);
     }
@@ -189,6 +218,17 @@ class RecursoServiceTest {
 
         // Assert
         assertTrue(error.getMessage().contains("no está activo"));
+        verifyNoInteractions(disponibilidadRepository);
+    }
+
+    @Test @DisplayName("Rechaza definir disponibilidad para un recurso inexistente")
+    void definirDisponibilidad_recursoInexistente_lanzaExcepcion() {
+        when(recursoRepository.findByIdParaActualizar(recursoId)).thenReturn(Optional.empty());
+
+        RecursoNoEncontradoException error = assertThrows(RecursoNoEncontradoException.class,
+                () -> recursoService.definirDisponibilidad(recursoId, inicio, fin));
+
+        assertTrue(error.getMessage().contains("no existe"));
         verifyNoInteractions(disponibilidadRepository);
     }
 }

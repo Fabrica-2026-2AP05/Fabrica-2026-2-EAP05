@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -123,6 +124,18 @@ class HorarioServiceTest {
         verifyNoInteractions(proveedorServicioRepository, horarioRepository);
     }
 
+    @Test @DisplayName("Rechaza un usuario cuyo rol no está definido")
+    void registrarHorario_usuarioConRolNulo_lanzaExcepcion() {
+        proveedor.setRol(null);
+        when(usuarioRepository.findById(proveedorId)).thenReturn(Optional.of(proveedor));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> horarioService.registrarHorario(request));
+
+        assertTrue(error.getMessage().contains("rol de proveedor"));
+        verifyNoInteractions(proveedorServicioRepository, horarioRepository);
+    }
+
     @Test @DisplayName("Rechaza un proveedor sin servicios")
     void registrarHorario_proveedorSinServicio_lanzaExcepcion() {
         // Arrange
@@ -130,7 +143,7 @@ class HorarioServiceTest {
         when(proveedorServicioRepository.existsByProveedorId(proveedorId)).thenReturn(false);
 
         // Act
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+        AccessDeniedException error = assertThrows(AccessDeniedException.class,
                 () -> horarioService.registrarHorario(request));
 
         // Assert
@@ -152,6 +165,26 @@ class HorarioServiceTest {
 
         // Assert
         assertTrue(error.getMessage().contains("solapa"));
+        verify(horarioRepository, never()).save(any());
+    }
+
+    @Test @DisplayName("Rechaza varios solapamientos informando el primer conflicto")
+    void registrarHorario_variosPeriodosSolapados_informaPrimerConflicto() {
+        Horario segundoConflicto = new Horario();
+        segundoConflicto.setInicio(request.getInicio().plusMinutes(30));
+        segundoConflicto.setFin(request.getFin().plusHours(1));
+        when(usuarioRepository.findById(proveedorId)).thenReturn(Optional.of(proveedor));
+        when(proveedorServicioRepository.existsByProveedorId(proveedorId)).thenReturn(true);
+        when(horarioRepository.findSolapados(proveedorId, request.getInicio(), request.getFin()))
+                .thenReturn(List.of(horario, segundoConflicto));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> horarioService.registrarHorario(request));
+
+        assertAll(
+                () -> assertTrue(error.getMessage().contains(horario.getInicio().toString())),
+                () -> assertTrue(error.getMessage().contains(horario.getFin().toString()))
+        );
         verify(horarioRepository, never()).save(any());
     }
 
