@@ -51,11 +51,26 @@ class ConfigBeansTest {
         assertNotNull(cors);
         assertAll(
                 () -> assertEquals(List.of("https://frontend.test", "http://localhost:5173"),
-                        cors.getAllowedOriginPatterns()),
+                        cors.getAllowedOrigins()),
                 () -> assertTrue(cors.getAllowedMethods().containsAll(
                         List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"))),
                 () -> assertEquals(List.of("*"), cors.getAllowedHeaders())
         );
+    }
+
+    @Test @DisplayName("SecurityConfig recorta espacios alrededor de los orígenes CORS")
+    void corsConfigurationSource_recortaEspaciosEnOrigenes() {
+        SecurityConfig config = new SecurityConfig(mock(JwtFilter.class));
+        ReflectionTestUtils.setField(config, "corsAllowedOrigins",
+                "https://frontend.test , http://localhost:5173");
+
+        CorsConfiguration cors = config.corsConfigurationSource()
+                .getCorsConfiguration(new MockHttpServletRequest("OPTIONS", "/api/test"));
+
+        assertNotNull(cors);
+        assertEquals(List.of("https://frontend.test", "http://localhost:5173"),
+                cors.getAllowedOrigins());
+        assertTrue(cors.getAllowedOrigins().stream().noneMatch(o -> o.contains(" ")));
     }
 
     @Test @DisplayName("El codificador BCrypt verifica la contraseña original")
