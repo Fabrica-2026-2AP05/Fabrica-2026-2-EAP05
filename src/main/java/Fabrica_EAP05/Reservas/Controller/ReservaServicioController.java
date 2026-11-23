@@ -9,6 +9,9 @@ import java.util.UUID;
 
 import Fabrica_EAP05.Reservas.DTO.HistorialNegocioResponse;
 import Fabrica_EAP05.Reservas.DTO.HistorialProveedorResponse;
+import Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +37,10 @@ import Fabrica_EAP05.Reservas.DTO.OcupacionServicioResponse;
 @RequiredArgsConstructor
 public class ReservaServicioController {
 
+    private static final Logger log = LoggerFactory.getLogger(ReservaServicioController.class);
+    private static final String CLAVE_ERROR = "error";
+    private static final String CLAVE_MENSAJE = "mensaje";
+
     private final ReservaServicioService reservaServicioService;
 
     @Operation(summary = "Crear reserva",
@@ -55,16 +62,16 @@ public class ReservaServicioController {
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of(CLAVE_ERROR,e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of(CLAVE_ERROR,e.getMessage()));
         } catch (DataAccessException e) {
             throw e;
         } catch (Exception e) {
-            System.err.println("[crearReserva] " + e.getMessage());
+            log.error("[crearReserva] {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error interno del servidor"));
+                    .body(Map.of(CLAVE_ERROR,"Error interno del servidor"));
         }
     }
     @PostMapping("/{id}/cancelar")
@@ -75,11 +82,11 @@ public class ReservaServicioController {
             return ResponseEntity.ok(reservaServicioService.cancelarReserva(email, id));
         } catch (NoSuchElementException e) {
             // Reserva inexistente o de otro cliente: mismo 404 para no revelar cuál de las dos
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensaje", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("mensaje", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("mensaje", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         }
     }
 
@@ -90,16 +97,16 @@ public class ReservaServicioController {
             @ApiResponse(responseCode = "401", description = "Sin autenticación"),
             @ApiResponse(responseCode = "403", description = "Sin permiso (requiere rol cliente)")
     })
-    @org.springframework.web.bind.annotation.GetMapping("/historial")
+    @GetMapping("/historial")
     @PreAuthorize("hasRole('cliente')")
     public ResponseEntity<?> consultarHistorial(@AuthenticationPrincipal String email) {
         try {
-            java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> historial =
+            List<HistorialReservaResponse> historial =
                     reservaServicioService.consultarHistorialCliente(email);
 
             if (historial.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
-                        "mensaje", "No existen reservas registradas",
+                        CLAVE_MENSAJE,"No existen reservas registradas",
                         "reservas", historial
                 ));
             }
@@ -107,7 +114,7 @@ public class ReservaServicioController {
             return ResponseEntity.ok(historial);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("mensaje", e.getMessage()));
+                    .body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         }
     }
 
@@ -127,7 +134,7 @@ public class ReservaServicioController {
 
             if (historial.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
-                        "mensaje", "No existen reservas registradas",
+                        CLAVE_MENSAJE,"No existen reservas registradas",
                         "reservas", historial
                 ));
             }
@@ -135,7 +142,7 @@ public class ReservaServicioController {
             return ResponseEntity.ok(historial);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("mensaje", e.getMessage()));
+                    .body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         }
     }
 
@@ -155,7 +162,7 @@ public class ReservaServicioController {
 
             if (historial.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
-                        "mensaje", "No existen reservas registradas para el negocio",
+                        CLAVE_MENSAJE,"No existen reservas registradas para el negocio",
                         "reservas", historial
                 ));
             }
@@ -163,7 +170,7 @@ public class ReservaServicioController {
             return ResponseEntity.ok(historial);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("mensaje", e.getMessage()));
+                    .body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         }
     }
 
@@ -187,7 +194,7 @@ public class ReservaServicioController {
 
             if (ocupacion.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
-                        "mensaje", "No existen datos de ocupación para el periodo consultado",
+                        CLAVE_MENSAJE,"No existen datos de ocupación para el periodo consultado",
                         "servicios", ocupacion
                 ));
             }
@@ -195,7 +202,7 @@ public class ReservaServicioController {
             return ResponseEntity.ok(ocupacion);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("mensaje", e.getMessage()));
+                    .body(Map.of(CLAVE_MENSAJE,e.getMessage()));
         }
     }
 }
