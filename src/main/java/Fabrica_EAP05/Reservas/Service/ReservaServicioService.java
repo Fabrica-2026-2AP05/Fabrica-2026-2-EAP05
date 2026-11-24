@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import Fabrica_EAP05.Reservas.DTO.CancelarReservaResponse;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaRequest;
 import Fabrica_EAP05.Reservas.DTO.CrearReservaResponse;
+import Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse;
 import Fabrica_EAP05.Reservas.DTO.HorarioDisponibleResponse;
 import Fabrica_EAP05.Reservas.Entities.Horario;
 import Fabrica_EAP05.Reservas.Entities.Recurso;
@@ -62,44 +64,28 @@ public class ReservaServicioService {
 
     @Transactional(readOnly = true)
     public java.util.List<Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse> consultarHistorialCliente(String email) {
-        Usuario cliente = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
-
-        if (!Boolean.TRUE.equals(cliente.getActivo())) {
-            throw new UsuarioInactivoException("El usuario no está activo");
-        }
+        Usuario cliente = obtenerUsuarioActivo(email);
 
         java.util.List<ReservaServicio> reservas = reservaServicioRepository.findByClienteIdOrderByCreadaEnDesc(cliente.getId());
 
-        return reservas.stream().map(reserva -> {
-            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
-                    .map(Servicio::getNombre)
-                    .orElse("Servicio no disponible");
+        return reservas.stream().map(this::mapHistorialReserva).toList();
+    }
 
-            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
-            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
-            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
+    private HistorialReservaResponse mapHistorialReserva(ReservaServicio reserva) {
+        Optional<Horario> horario = horarioRepository.findById(reserva.getHorarioId());
 
-            String nombreRecurso = null;
-            if (reserva.getRecursoId() != null) {
-                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
-                        .map(Recurso::getNombre)
-                        .orElse(null);
-            }
-
-            return new Fabrica_EAP05.Reservas.DTO.HistorialReservaResponse(
-                    reserva.getId(),
-                    reserva.getServicioId(),
-                    nombreServicio,
-                    reserva.getHorarioId(),
-                    inicio,
-                    fin,
-                    reserva.getRecursoId(),
-                    nombreRecurso,
-                    reserva.getEstado().name(),
-                    aOffset(reserva.getCreadaEn())
-            );
-        }).toList();
+        return new HistorialReservaResponse(
+                reserva.getId(),
+                reserva.getServicioId(),
+                nombreServicio(reserva.getServicioId()),
+                reserva.getHorarioId(),
+                horario.map(Horario::getInicio).map(this::aOffset).orElse(null),
+                horario.map(Horario::getFin).map(this::aOffset).orElse(null),
+                reserva.getRecursoId(),
+                nombreRecurso(reserva.getRecursoId()),
+                reserva.getEstado().name(),
+                aOffset(reserva.getCreadaEn())
+        );
     }
 
     private final EntityManager entityManager;
@@ -114,11 +100,7 @@ public class ReservaServicioService {
         }
 
         // 0-1. Cliente autenticado y activo
-        Usuario cliente = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
-        if (!Boolean.TRUE.equals(cliente.getActivo())) {
-            throw new UsuarioInactivoException("El usuario no está activo");
-        }
+        Usuario cliente = obtenerUsuarioActivo(email);
 
         // 2. Servicio existe y está activo
         Servicio servicio = servicioRepository.findById(request.getServicioId())
@@ -150,7 +132,7 @@ public class ReservaServicioService {
         reserva.setClienteId(cliente.getId());
         reserva.setServicioId(servicio.getId());
         reserva.setHorarioId(horario.getId());
-        reserva.setRecursoId(recurso != null ? recurso.getId() : null);
+        reserva.setRecursoId(Optional.ofNullable(recurso).map(Recurso::getId).orElse(null));
         reserva.setEstado(EstadoReserva.confirmada);
 
         // 7. Marcar el horario como reservado
@@ -172,7 +154,7 @@ public class ReservaServicioService {
                 aOffset(horario.getInicio()),
                 aOffset(horario.getFin()),
                 recargada.getRecursoId(),
-                recurso != null ? recurso.getNombre() : null,
+                Optional.ofNullable(recurso).map(Recurso::getNombre).orElse(null),
                 recargada.getEstado().name(),
                 aOffset(recargada.getCreadaEn())
         );
@@ -214,13 +196,40 @@ public class ReservaServicioService {
     private OffsetDateTime aOffset(LocalDateTime fecha) {
         return fecha != null ? fecha.atZone(ZoneId.systemDefault()).toOffsetDateTime() : null;
     }
+
+    // Usuario autenticado y activo: mismas excepciones y mensajes en todos los casos de uso
+    private Usuario obtenerUsuarioActivo(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+        if (!Boolean.TRUE.equals(usuario.getActivo())) {
+            throw new UsuarioInactivoException("El usuario no está activo");
+        }
+        return usuario;
+    }
+
+    private String nombreServicio(UUID servicioId) {
+        return servicioRepository.findById(servicioId)
+                .map(Servicio::getNombre)
+                .orElse("Servicio no disponible");
+    }
+
+    private String nombreCliente(UUID clienteId) {
+        return usuarioRepository.findById(clienteId)
+                .map(Usuario::getNombre)
+                .orElse("Cliente no disponible");
+    }
+
+    // Sin recurso asignado no se consulta el repositorio
+    private String nombreRecurso(UUID recursoId) {
+        return Optional.ofNullable(recursoId)
+                .flatMap(recursoRepository::findById)
+                .map(Recurso::getNombre)
+                .orElse(null);
+    }
+
     @Transactional
     public CancelarReservaResponse cancelarReserva(String email, UUID reservaId) {
-    Usuario cliente = usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
-    if (!Boolean.TRUE.equals(cliente.getActivo())) {
-        throw new UsuarioInactivoException("El usuario no está activo");
-    }
+    Usuario cliente = obtenerUsuarioActivo(email);
 
     // Mismo mensaje si no existe o es de otro cliente: no se revela cuál de las dos
     ReservaServicio reserva = reservaServicioRepository.findByIdParaActualizar(reservaId)
@@ -244,128 +253,39 @@ public class ReservaServicioService {
 
     @Transactional(readOnly = true)
     public List<HistorialProveedorResponse> consultarHistorialProveedor(String email) {
-        Usuario proveedor = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
-
-        if (!Boolean.TRUE.equals(proveedor.getActivo())) {
-            throw new UsuarioInactivoException("El usuario no está activo");
-        }
+        Usuario proveedor = obtenerUsuarioActivo(email);
 
         List<ReservaServicio> reservas = reservaServicioRepository.findHistorialByProveedorId(proveedor.getId());
 
-        return reservas.stream().map(reserva -> {
-            String nombreServicio = servicioRepository.findById(reserva.getServicioId())
-                    .map(Servicio::getNombre)
-                    .orElse("Servicio no disponible");
+        return reservas.stream().map(this::mapHistorialProveedor).toList();
+    }
 
-            String nombreCliente = usuarioRepository.findById(reserva.getClienteId())
-                    .map(Usuario::getNombre)
-                    .orElse("Cliente no disponible");
+    private HistorialProveedorResponse mapHistorialProveedor(ReservaServicio reserva) {
+        Optional<Horario> horario = horarioRepository.findById(reserva.getHorarioId());
 
-            Horario horario = horarioRepository.findById(reserva.getHorarioId()).orElse(null);
-            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
-            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
-
-            String nombreRecurso = null;
-            if (reserva.getRecursoId() != null) {
-                nombreRecurso = recursoRepository.findById(reserva.getRecursoId())
-                        .map(Recurso::getNombre)
-                        .orElse(null);
-            }
-
-            return new HistorialProveedorResponse(
-                    reserva.getId(),
-                    reserva.getServicioId(),
-                    nombreServicio,
-                    reserva.getClienteId(),
-                    nombreCliente,
-                    reserva.getHorarioId(),
-                    inicio,
-                    fin,
-                    reserva.getRecursoId(),
-                    nombreRecurso,
-                    reserva.getEstado().name(),
-                    aOffset(reserva.getCreadaEn())
-            );
-        }).toList();
-
-
+        return new HistorialProveedorResponse(
+                reserva.getId(),
+                reserva.getServicioId(),
+                nombreServicio(reserva.getServicioId()),
+                reserva.getClienteId(),
+                nombreCliente(reserva.getClienteId()),
+                reserva.getHorarioId(),
+                horario.map(Horario::getInicio).map(this::aOffset).orElse(null),
+                horario.map(Horario::getFin).map(this::aOffset).orElse(null),
+                reserva.getRecursoId(),
+                nombreRecurso(reserva.getRecursoId()),
+                reserva.getEstado().name(),
+                aOffset(reserva.getCreadaEn())
+        );
     }
 
     @Transactional(readOnly = true)
     public List<HistorialNegocioResponse> consultarHistorialNegocio(String email) {
-        Usuario admin = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
+        obtenerUsuarioActivo(email);
 
-        if (!Boolean.TRUE.equals(admin.getActivo())) {
-            throw new UsuarioInactivoException("El usuario no está activo");
-        }
-
-        List<HistorialNegocioResponse> historial = new ArrayList<>();
-
-        // 1. Traer todas las reservas de servicios
-        for (ReservaServicio r : reservaServicioRepository.findAll()) {
-            String nombreServicio = servicioRepository.findById(r.getServicioId())
-                    .map(Servicio::getNombre)
-                    .orElse("Servicio no disponible");
-
-            String nombreCliente = usuarioRepository.findById(r.getClienteId())
-                    .map(Usuario::getNombre)
-                    .orElse("Cliente no disponible");
-
-            Horario horario = horarioRepository.findById(r.getHorarioId()).orElse(null);
-            OffsetDateTime inicio = horario != null ? aOffset(horario.getInicio()) : null;
-            OffsetDateTime fin = horario != null ? aOffset(horario.getFin()) : null;
-
-            String nombreRecurso = null;
-            if (r.getRecursoId() != null) {
-                nombreRecurso = recursoRepository.findById(r.getRecursoId())
-                        .map(Recurso::getNombre)
-                        .orElse(null);
-            }
-
-            historial.add(new HistorialNegocioResponse(
-                    r.getId(),
-                    "SERVICIO",
-                    r.getServicioId(),
-                    nombreServicio,
-                    r.getClienteId(),
-                    nombreCliente,
-                    inicio,
-                    fin,
-                    r.getRecursoId(),
-                    nombreRecurso,
-                    r.getEstado().name(),
-                    aOffset(r.getCreadaEn())
-            ));
-        }
-
-        // 2. Traer todas las reservas de eventos
-        for (ReservaEvento re : reservaEventoRepository.findAll()) {
-            Evento evento = eventoRepository.findById(re.getEventoId()).orElse(null);
-            String nombreEvento = evento != null ? evento.getNombre() : "Evento no disponible";
-            OffsetDateTime inicio = evento != null ? aOffset(evento.getInicio()) : null;
-            OffsetDateTime fin = evento != null ? aOffset(evento.getFin()) : null;
-
-            String nombreCliente = usuarioRepository.findById(re.getClienteId())
-                    .map(Usuario::getNombre)
-                    .orElse("Cliente no disponible");
-
-            historial.add(new HistorialNegocioResponse(
-                    re.getId(),
-                    "EVENTO",
-                    re.getEventoId(),
-                    nombreEvento,
-                    re.getClienteId(),
-                    nombreCliente,
-                    inicio,
-                    fin,
-                    null,
-                    null,
-                    re.getEstado().name(),
-                    null
-            ));
-        }
+        // 1. Reservas de servicios, 2. reservas de eventos (mismo orden de carga que antes)
+        List<HistorialNegocioResponse> historial = new ArrayList<>(historialNegocioServicios());
+        historial.addAll(historialNegocioEventos());
 
         // 3. Ordenar todo por fecha de inicio (más recientes primero)
         historial.sort(Comparator.comparing(
@@ -374,6 +294,54 @@ public class ReservaServicioService {
         ));
 
         return historial;
+    }
+
+    private List<HistorialNegocioResponse> historialNegocioServicios() {
+        return reservaServicioRepository.findAll().stream().map(this::mapHistorialNegocio).toList();
+    }
+
+    private List<HistorialNegocioResponse> historialNegocioEventos() {
+        return reservaEventoRepository.findAll().stream().map(this::mapReservaEvento).toList();
+    }
+
+    private HistorialNegocioResponse mapHistorialNegocio(ReservaServicio r) {
+        Optional<Horario> horario = horarioRepository.findById(r.getHorarioId());
+
+        return new HistorialNegocioResponse(
+                r.getId(),
+                "SERVICIO",
+                r.getServicioId(),
+                nombreServicio(r.getServicioId()),
+                r.getClienteId(),
+                nombreCliente(r.getClienteId()),
+                horario.map(Horario::getInicio).map(this::aOffset).orElse(null),
+                horario.map(Horario::getFin).map(this::aOffset).orElse(null),
+                r.getRecursoId(),
+                nombreRecurso(r.getRecursoId()),
+                r.getEstado().name(),
+                aOffset(r.getCreadaEn())
+        );
+    }
+
+    private HistorialNegocioResponse mapReservaEvento(ReservaEvento re) {
+        Evento evento = eventoRepository.findById(re.getEventoId()).orElse(null);
+        // Ternario conservado: si el evento existe pero su nombre es null, se devuelve null (no el texto por defecto)
+        String nombreEvento = evento != null ? evento.getNombre() : "Evento no disponible";
+
+        return new HistorialNegocioResponse(
+                re.getId(),
+                "EVENTO",
+                re.getEventoId(),
+                nombreEvento,
+                re.getClienteId(),
+                nombreCliente(re.getClienteId()),
+                Optional.ofNullable(evento).map(Evento::getInicio).map(this::aOffset).orElse(null),
+                Optional.ofNullable(evento).map(Evento::getFin).map(this::aOffset).orElse(null),
+                null,
+                null,
+                re.getEstado().name(),
+                null
+        );
     }
 
     @Transactional(readOnly = true)
@@ -387,12 +355,7 @@ public class ReservaServicioService {
             throw new IllegalArgumentException("La fecha 'desde' debe ser anterior a 'hasta'");
         }
 
-        Usuario admin = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado"));
-
-        if (!Boolean.TRUE.equals(admin.getActivo())) {
-            throw new UsuarioInactivoException("El usuario no está activo");
-        }
+        obtenerUsuarioActivo(email);
 
         List<OcupacionServicioResponse> reporte = new ArrayList<>();
 
