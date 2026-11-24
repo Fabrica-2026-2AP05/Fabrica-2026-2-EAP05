@@ -44,6 +44,9 @@ import lombok.Setter;
 @RequiredArgsConstructor
 public class ServicioController {
 
+    private static final String CLAVE_ERROR = "error";
+    private static final String PREFIJO_ERROR_INTERNO = "Error interno: ";
+
     private final ServicioService servicioService;
 
     private final ReservaServicioService reservaServicioService;
@@ -96,8 +99,7 @@ public class ServicioController {
             servicioService.validarRecursoRequerido(request.getRecursoId());
             return ResponseEntity.ok("El recurso es válido y está activo");
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.BAD_REQUEST, CLAVE_ERROR, e.getMessage());
         }
     }
 
@@ -117,14 +119,11 @@ public class ServicioController {
             RegistrarServicioResponse response = servicioService.registrarServicio(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (RecursoDuplicadoException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.CONFLICT, CLAVE_ERROR, e.getMessage());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.BAD_REQUEST, CLAVE_ERROR, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error interno: " + e.getMessage()));
+            return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, CLAVE_ERROR, PREFIJO_ERROR_INTERNO + e.getMessage());
         }
     }
 
@@ -147,18 +146,14 @@ public class ServicioController {
             ModificarServicioResponse response = servicioService.modificarServicio(servicioId, request);
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.NOT_FOUND, CLAVE_ERROR, e.getMessage());
         } catch (IllegalStateException | RecursoDuplicadoException e) {
             // Servicio con reservas asociadas o nombre duplicado
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.CONFLICT, CLAVE_ERROR, e.getMessage());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.BAD_REQUEST, CLAVE_ERROR, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error interno: " + e.getMessage()));
+            return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, CLAVE_ERROR, PREFIJO_ERROR_INTERNO + e.getMessage());
         }
     }
 
@@ -182,11 +177,14 @@ public class ServicioController {
             List<HorarioDisponibleResponse> horarios = reservaServicioService.consultarDisponibilidad(servicioId);
             return ResponseEntity.ok(horarios);
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.NOT_FOUND, CLAVE_ERROR, e.getMessage());
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", e.getMessage()));
+            return errorResponse(HttpStatus.CONFLICT, CLAVE_ERROR, e.getMessage());
         }
+    }
+
+    // Mismo cuerpo que antes: Map.of(clave, mensaje) con el status indicado
+    private static ResponseEntity<Map<String, String>> errorResponse(HttpStatus status, String clave, String mensaje) {
+        return ResponseEntity.status(status).body(Map.of(clave, mensaje));
     }
 }
